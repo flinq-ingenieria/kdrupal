@@ -7,12 +7,16 @@ from pathlib import Path
 from typing import Any
 
 from flask import Flask, abort, redirect, render_template, request, url_for
+from dotenv import load_dotenv
 
 from webapp.db import Database
 from webapp.services import DnsService, DrupalProvisioner, K8sService, ServiceError
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 TEMPLATE_PATH = BASE_DIR / "drupal.template.yaml"
+
+# Carga automática de .env desde web_panel/.env si existe
+load_dotenv(Path(__file__).resolve().parent / ".env")
 
 
 def create_app() -> Flask:

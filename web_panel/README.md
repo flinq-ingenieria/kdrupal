@@ -21,12 +21,8 @@ cd web_panel
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-export PANEL_AUTH_TOKEN='cambia-este-token'
-export DEFAULT_BASE_DOMAIN='tudominio.com'
-export DINAHOSTING_API_URL='https://dinahosting.com/special/api.php'
-export DINAHOSTING_AUTH_USER='tu_usuario_dinahosting'
-export DINAHOSTING_AUTH_PWD='tu_password_dinahosting'
-export DINAHOSTING_DNS_TARGET='203.0.113.10'
+cp .env.sample .env
+# Edita .env con tus valores
 python app.py
 ```
 
@@ -40,3 +36,6 @@ Abrir:
 - `POST /sites` crear sitio
 - `POST /sites/<site_id>/delete` eliminar sitio completo (confirmación por slug)
 - `GET /jobs/<job_id>` estado y logs
+
+
+La app carga automáticamente `web_panel/.env` si existe.

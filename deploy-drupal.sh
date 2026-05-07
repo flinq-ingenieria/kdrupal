@@ -34,6 +34,25 @@ read_input_with_default() {
   printf '%s' "$result"
 }
 
+generate_random_subdomain() {
+  local base_domain="$1"
+  local slug random_part
+  slug="drupal"
+  random_part="$(openssl rand -hex 4)"
+  printf '%s-%s.%s' "$slug" "$random_part" "$base_domain"
+}
+
+provision_dns_record_placeholder() {
+  local fqdn="$1"
+  local target="$2"
+  local ttl="$3"
+
+  echo "DNS provider placeholder no implementado."
+  echo "Implementa esta función para crear el registro DNS del host '$fqdn'."
+  echo "Entradas esperadas -> provider: ${DNS_PROVIDER:-<dns-provider>}, target: ${target:-<ip-o-cname>}, ttl: ${ttl}"
+  return 1
+}
+
 is_true() {
   case "${1:-}" in
     1|true|TRUE|True|yes|YES|Yes|y|Y|si|SI|Si|s|S) return 0 ;;
@@ -45,12 +64,28 @@ echo "=== Despliegue de Drupal CMS en Kubernetes ==="
 echo ""
 
 DOMAIN="${DOMAIN:-}"
+DOMAIN_SOURCE="manual"
 NAMESPACE="${NAMESPACE:-}"
+BASE_DOMAIN="${BASE_DOMAIN:-}"
+DNS_TARGET="${DNS_TARGET:-}"
+DNS_TTL="${DNS_TTL:-300}"
+DNS_PROVIDER="${DNS_PROVIDER:-placeholder}"
 if [ -z "$DOMAIN" ]; then
-  read -rp "Dominio (ej: example.com): " DOMAIN
+  read -rp "Dominio (ej: example.com) [vacío para autogenerar]: " DOMAIN
 fi
 if [ -z "$NAMESPACE" ]; then
   read -rp "Namespace de Kubernetes:   " NAMESPACE
+fi
+
+# Si no se informa DOMAIN, generar subdominio aleatorio bajo BASE_DOMAIN.
+if [ -z "$DOMAIN" ]; then
+  [ -n "$BASE_DOMAIN" ] || { echo "Error: DOMAIN vacío y BASE_DOMAIN no definido."; exit 1; }
+  if ! echo "$BASE_DOMAIN" | grep -qE '^[a-zA-Z0-9][a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'; then
+    echo "Error: BASE_DOMAIN inválido '$BASE_DOMAIN'"
+    exit 1
+  fi
+  DOMAIN="$(generate_random_subdomain "$BASE_DOMAIN")"
+  DOMAIN_SOURCE="generated"
 fi
 
 # Validar dominio
@@ -145,6 +180,10 @@ export NAMESPACE DOMAIN MARIADB_ROOT_PASSWORD MARIADB_PASSWORD DRUPAL_HASH_SALT 
 echo ""
 echo "--- Resumen del despliegue ---"
 printf "  Dominio:          %s\n" "$DOMAIN"
+printf "  Origen dominio:   %s\n" "$DOMAIN_SOURCE"
+if [ "$DOMAIN_SOURCE" = "generated" ]; then
+  printf "  BASE_DOMAIN:      %s\n" "$BASE_DOMAIN"
+fi
 printf "  Namespace:        %s\n" "$NAMESPACE"
 printf "  TLS Secret:       %s\n" "$TLS_SECRET_NAME"
 printf "  Site name:        %s\n" "$DRUPAL_SITE_NAME"
@@ -169,6 +208,17 @@ fi
 CURRENT_STAGE="apply-manifests"
 echo ""
 echo "Aplicando manifiestos..."
+
+if [ "$DOMAIN_SOURCE" = "generated" ]; then
+  CURRENT_STAGE="dns-provisioning"
+  echo "Provisionando DNS para dominio autogenerado..."
+  if ! provision_dns_record_placeholder "$DOMAIN" "$DNS_TARGET" "$DNS_TTL"; then
+    echo "Error: no se pudo provisionar DNS para '$DOMAIN'."
+    echo "Implementa la integración del proveedor DNS en provision_dns_record_placeholder()."
+    exit 1
+  fi
+  CURRENT_STAGE="apply-manifests"
+fi
 
 # envsubst con lista explícita para no tocar variables de nginx ($uri, $query_string...)
 RENDERED_MANIFEST="$(mktemp)"

@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Job {{ job.id[:8] }}</title>
+    {% if job.status == 'running' or job.status == 'queued' %}
+    <meta http-equiv="refresh" content="3" />
+    {% endif %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
+  </head>
+  <body>
+    <main class="container">
+      <p><a href="/">← Volver</a></p>
+      <h1>Job {{ job.id }}</h1>
+      <p>
+        <span class="status status-{{ job.status }}">{{ job.status }}</span>
+        {% if job.return_code is not none %}
+        <span>exit={{ job.return_code }}</span>
+        {% endif %}
+      </p>
+      <h2>Parámetros</h2>
+      <pre>{% for k, v in job.params.items() %}{{ k }}={{ v }}
+{% endfor %}</pre>
+
+      <h2>Logs</h2>
+      <pre class="logs">{% for line in job.logs %}{{ line }}
+{% endfor %}</pre>
+    </main>
+  </body>
+</html>

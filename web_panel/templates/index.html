@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Drupal Cluster Panel</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
+  </head>
+  <body>
+    <main class="container">
+      <h1>Drupal Cluster Panel</h1>
+      <p>Lanza despliegues con el mismo flujo de <code>deploy-drupal.sh</code>.</p>
+
+      <section class="card">
+        <h2>Nuevo despliegue</h2>
+        <form action="/deploy" method="post" class="form-grid">
+          <label>Namespace* <input name="namespace" required /></label>
+          <label>Dominio (opcional) <input name="domain" placeholder="example.com" /></label>
+          <label>Base domain (si no hay dominio) <input name="base_domain" placeholder="example.com" /></label>
+          <label>Site name <input name="site_name" value="Mi Drupal" /></label>
+          <label>Locale <input name="locale" value="es" /></label>
+          <label>Admin user <input name="admin_user" value="admin" /></label>
+          <label>Admin email <input name="admin_email" /></label>
+          <label>Admin pass (opcional) <input name="admin_pass" /></label>
+          <label>Módulos <input name="modules" value="redirect" /></label>
+          <label>Timeout (seg) <input name="timeout" value="900" /></label>
+          <label>DNS target (opcional) <input name="dns_target" /></label>
+          <label>DNS ttl (opcional) <input name="dns_ttl" value="300" /></label>
+          <label>DNS provider (opcional) <input name="dns_provider" value="placeholder" /></label>
+          <button type="submit">Desplegar</button>
+        </form>
+      </section>
+
+      <section class="card">
+        <h2>Ejecuciones</h2>
+        {% if jobs %}
+        <ul class="job-list">
+          {% for job in jobs %}
+          <li>
+            <a href="{{ url_for('job_detail', job_id=job.id) }}">{{ job.id[:8] }}</a>
+            <span class="status status-{{ job.status }}">{{ job.status }}</span>
+            <span>{{ job.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</span>
+            <span>ns={{ job.params.get('NAMESPACE', '-') }}</span>
+            <span>domain={{ job.params.get('DOMAIN') or '(autogenerado)' }}</span>
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <p>No hay ejecuciones todavía.</p>
+        {% endif %}
+      </section>
+    </main>
+  </body>
+</html>

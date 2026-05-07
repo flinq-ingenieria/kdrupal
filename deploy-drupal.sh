@@ -42,18 +42,6 @@ generate_random_subdomain() {
   printf '%s-%s.%s' "$slug" "$random_part" "$base_domain"
 }
 
-provision_dns_record_placeholder() {
-  local fqdn="$1"
-  local auth_token="$2"
-  local target="$3"
-  local ttl="$4"
-
-  echo "DNS provider placeholder no implementado."
-  echo "Implementa esta función para crear el registro DNS del host '$fqdn'."
-  echo "Entradas esperadas -> provider: ${DNS_PROVIDER:-<dns-provider>}, token: ${auth_token:+***}, target: ${target:-<ip-o-cname>}, ttl: ${ttl}"
-  return 1
-}
-
 is_true() {
   case "${1:-}" in
     1|true|TRUE|True|yes|YES|Yes|y|Y|si|SI|Si|s|S) return 0 ;;
@@ -67,13 +55,10 @@ echo ""
 DOMAIN="${DOMAIN:-}"
 DOMAIN_SOURCE="manual"
 NAMESPACE="${NAMESPACE:-}"
-BASE_DOMAIN="${BASE_DOMAIN:-}"
-DNS_TARGET="${DNS_TARGET:-}"
-DNS_TTL="${DNS_TTL:-300}"
-DNS_PROVIDER="${DNS_PROVIDER:-placeholder}"
-DNS_AUTH_TOKEN="${DNS_AUTH_TOKEN:-}"
-if [ -z "$DOMAIN" ]; then
-  read -rp "Dominio (ej: example.com) [vacío para autogenerar]: " DOMAIN
+BASE_DOMAIN="${BASE_DOMAIN:-example.com}"
+WWW_MODE="${WWW_MODE:-auto}" # auto|with|without
+if [ -z "$DOMAIN" ] && [ -t 0 ]; then
+  read -rp "Dominio/subdominio (ej: drupal.example.com) [vacío para autogenerar]: " DOMAIN
 fi
 if [ -z "$NAMESPACE" ]; then
   read -rp "Namespace de Kubernetes:   " NAMESPACE
@@ -102,7 +87,7 @@ if ! echo "$NAMESPACE" | grep -qE '^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$'; then
   exit 1
 fi
 
-DEPLOY_TIMEOUT_SECONDS="${DEPLOY_TIMEOUT_SECONDS:-900}"
+DEPLOY_TIMEOUT_SECONDS=900
 DRUPAL_SITE_NAME="${DRUPAL_SITE_NAME:-Mi Drupal}"
 DRUPAL_LOCALE="${DRUPAL_LOCALE:-es}"
 DRUPAL_ADMIN_USER="${DRUPAL_ADMIN_USER:-admin}"
@@ -162,20 +147,31 @@ TLS_SECRET_NAME="$(echo "$DOMAIN" | tr '.' '-')-tls"
 
 # Escapar puntos del dominio para regex PHP
 DOMAIN_REGEX="$(echo "$DOMAIN" | sed 's/\./\\\\./g')"
-DOT_COUNT="$(awk -F. '{print NF-1}' <<< "$DOMAIN")"
-if [ "$DOT_COUNT" -eq 1 ]; then
-  INCLUDE_WWW=true
-else
-  INCLUDE_WWW=false
-fi
-
 if [ -t 0 ]; then
   DRUPAL_SITE_NAME="$(read_input_with_default "Nombre del sitio Drupal" "$DRUPAL_SITE_NAME")"
   DRUPAL_LOCALE="$(read_input_with_default "Locale Drupal (ej: es, en)" "$DRUPAL_LOCALE")"
   DRUPAL_ADMIN_USER="$(read_input_with_default "Usuario admin Drupal" "$DRUPAL_ADMIN_USER")"
   DRUPAL_ADMIN_EMAIL="$(read_input_with_default "Email admin Drupal" "$DRUPAL_ADMIN_EMAIL")"
   DRUPAL_ENABLE_MODULES="$(read_input_with_default "Módulos a habilitar (separados por espacio)" "$DRUPAL_ENABLE_MODULES")"
+  WWW_MODE="$(read_input_with_default "WWW mode (auto|with|without)" "$WWW_MODE")"
 fi
+
+case "$WWW_MODE" in
+  with) INCLUDE_WWW=true ;;
+  without) INCLUDE_WWW=false ;;
+  auto)
+    DOT_COUNT="$(awk -F. '{print NF-1}' <<< "$DOMAIN")"
+    if [ "$DOT_COUNT" -eq 1 ]; then
+      INCLUDE_WWW=true
+    else
+      INCLUDE_WWW=false
+    fi
+    ;;
+  *)
+    echo "Error: WWW_MODE inválido '$WWW_MODE' (usa auto|with|without)"
+    exit 1
+    ;;
+esac
 
 export NAMESPACE DOMAIN MARIADB_ROOT_PASSWORD MARIADB_PASSWORD DRUPAL_HASH_SALT TLS_SECRET_NAME DOMAIN_REGEX DRUPAL_ADMIN_USER DRUPAL_ADMIN_PASS DRUPAL_ADMIN_EMAIL
 
@@ -195,6 +191,7 @@ printf "  Admin email:      %s\n" "$DRUPAL_ADMIN_EMAIL"
 printf "  Módulos:          %s\n" "$DRUPAL_ENABLE_MODULES"
 printf "  Timeout rollout:  %ss\n" "$DEPLOY_TIMEOUT_SECONDS"
 printf "  Incluir www:      %s\n" "$INCLUDE_WWW"
+printf "  WWW mode:         %s\n" "$WWW_MODE"
 echo ""
 
 if is_true "$AUTO_CONFIRM"; then
@@ -210,17 +207,6 @@ fi
 CURRENT_STAGE="apply-manifests"
 echo ""
 echo "Aplicando manifiestos..."
-
-if [ "$DOMAIN_SOURCE" = "generated" ]; then
-  CURRENT_STAGE="dns-provisioning"
-  echo "Provisionando DNS para dominio autogenerado..."
-  if ! provision_dns_record_placeholder "$DOMAIN" "$DNS_AUTH_TOKEN" "$DNS_TARGET" "$DNS_TTL"; then
-    echo "Error: no se pudo provisionar DNS para '$DOMAIN'."
-    echo "Implementa la integración del proveedor DNS en provision_dns_record_placeholder()."
-    exit 1
-  fi
-  CURRENT_STAGE="apply-manifests"
-fi
 
 # envsubst con lista explícita para no tocar variables de nginx ($uri, $query_string...)
 RENDERED_MANIFEST="$(mktemp)"

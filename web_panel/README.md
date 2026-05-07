@@ -1,13 +1,18 @@
-# Drupal Cluster Web Panel
+# Drupal Cluster Manager
 
-Panel web simple para lanzar el flujo de `deploy-drupal.sh` y ver estado/logs de ejecución.
+Aplicación web Flask para crear/listar/eliminar sitios Drupal en Kubernetes sin usar script bash en runtime.
 
-## Requisitos
+## Variables de entorno
 
-- Python 3.11+
-- Acceso local a `kubectl` y contexto configurado
-- El script `deploy-drupal.sh` en la raíz del repo
-- `PANEL_AUTH_TOKEN` configurado (obligatorio)
+- `PANEL_AUTH_TOKEN` (obligatoria)
+- `DEFAULT_BASE_DOMAIN` (obligatoria, usada para autogenerar dominio)
+- `NAMESPACE_PREFIX` (opcional, por defecto `drupal-`)
+- `SQLITE_PATH` (opcional, por defecto `web_panel/data/panel.db`)
+- `DINAHOSTING_API_URL` (obligatoria)
+- `DINAHOSTING_AUTH_USER` (obligatoria)
+- `DINAHOSTING_AUTH_PWD` (obligatoria)
+- `DINAHOSTING_DNS_TARGET` (obligatoria, IP/CNAME objetivo)
+- `DINAHOSTING_DNS_TTL` (opcional, por defecto `300`)
 
 ## Arranque
 
@@ -17,15 +22,21 @@ python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 export PANEL_AUTH_TOKEN='cambia-este-token'
+export DEFAULT_BASE_DOMAIN='tudominio.com'
+export DINAHOSTING_API_URL='https://dinahosting.com/special/api.php'
+export DINAHOSTING_AUTH_USER='tu_usuario_dinahosting'
+export DINAHOSTING_AUTH_PWD='tu_password_dinahosting'
+export DINAHOSTING_DNS_TARGET='203.0.113.10'
 python app.py
 ```
 
-Abre `http://localhost:8080/?auth_token=cambia-este-token`.
+Abrir:
 
-También puedes autenticar con cabecera `Authorization: Bearer <token>` o `X-Auth-Token: <token>`.
+`http://localhost:8080/?auth_token=cambia-este-token`
 
-## Notas
+## Endpoints
 
-- El proceso mantiene los jobs en memoria; al reiniciar la app se pierden historiales.
-- Usa `AUTO_CONFIRM=true` para evitar prompts interactivos del script.
-- Si usas `base_domain` y no `domain`, el script intentará provisión DNS y ahora pasa `DNS_AUTH_TOKEN` como segundo argumento a `provision_dns_record_placeholder(fqdn, token, target, ttl)`.
+- `GET /` dashboard (crear/listar/eliminar)
+- `POST /sites` crear sitio
+- `POST /sites/<site_id>/delete` eliminar sitio completo (confirmación por slug)
+- `GET /jobs/<job_id>` estado y logs

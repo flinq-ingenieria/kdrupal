@@ -3,47 +3,85 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Drupal Cluster Panel</title>
+    <title>Drupal Cluster Manager</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
   </head>
   <body>
     <main class="container">
-      <h1>Drupal Cluster Panel</h1>
-      <p>Lanza despliegues con el mismo flujo de <code>deploy-drupal.sh</code>.</p>
+      <h1>Drupal Cluster Manager</h1>
+      <p>Namespaces gestionados con prefijo <code>{{ namespace_prefix }}</code>. Si no informas dominio, se genera bajo <code>{{ default_base_domain }}</code>.</p>
 
       <section class="card">
-        <h2>Nuevo despliegue</h2>
-        <form action="/deploy" method="post" class="form-grid">
+        <h2>Crear Sitio</h2>
+        <form action="/sites" method="post" class="form-grid">
           <label>Token panel* <input name="auth_token" required value="{{ auth_token }}" /></label>
-          <label>Namespace* <input name="namespace" required /></label>
-          <label>Dominio (opcional) <input name="domain" placeholder="example.com" /></label>
-          <label>Base domain (si no hay dominio) <input name="base_domain" placeholder="example.com" /></label>
+          <label>Site slug* <input name="site_slug" required placeholder="cliente-a" /></label>
+          <label>Dominio/Subdominio (opcional) <input name="domain" placeholder="drupal.tudominio.com" /></label>
+          <label>WWW
+            <select name="www_mode">
+              <option value="auto" selected>Auto</option>
+              <option value="with">Con www</option>
+              <option value="without">Sin www</option>
+            </select>
+          </label>
           <label>Site name <input name="site_name" value="Mi Drupal" /></label>
           <label>Locale <input name="locale" value="es" /></label>
           <label>Admin user <input name="admin_user" value="admin" /></label>
           <label>Admin email <input name="admin_email" /></label>
           <label>Admin pass (opcional) <input name="admin_pass" /></label>
           <label>Módulos <input name="modules" value="redirect" /></label>
-          <label>Timeout (seg) <input name="timeout" value="900" /></label>
-          <label>DNS target (opcional) <input name="dns_target" /></label>
-          <label>DNS ttl (opcional) <input name="dns_ttl" value="300" /></label>
-          <label>DNS provider (opcional) <input name="dns_provider" value="placeholder" /></label>
-          <label>DNS auth token (opcional) <input name="dns_auth_token" /></label>
-          <button type="submit">Desplegar</button>
+          <button type="submit">Crear sitio</button>
         </form>
       </section>
 
       <section class="card">
-        <h2>Ejecuciones</h2>
+        <h2>Sitios</h2>
+        {% if sites %}
+        <table>
+          <thead>
+            <tr>
+              <th>Slug</th><th>Namespace</th><th>Domain</th><th>Status</th><th>Creado</th><th>Eliminar</th>
+            </tr>
+          </thead>
+          <tbody>
+          {% for s in sites %}
+            <tr>
+              <td>{{ s.slug }}</td>
+              <td><code>{{ s.namespace }}</code></td>
+              <td>{{ s.domain }}</td>
+              <td>{{ s.status }}</td>
+              <td>{{ s.created_at }}</td>
+              <td>
+                {% if not s.deleted_at %}
+                <form action="{{ url_for('delete_site', site_id=s.site_id) }}" method="post" class="inline-delete">
+                  <input type="hidden" name="auth_token" value="{{ auth_token }}" />
+                  <input name="confirm_slug" placeholder="{{ s.slug }}" required />
+                  <button type="submit">Eliminar</button>
+                </form>
+                {% else %}
+                <span>Eliminado</span>
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <p>No hay sitios todavía.</p>
+        {% endif %}
+      </section>
+
+      <section class="card">
+        <h2>Jobs</h2>
         {% if jobs %}
         <ul class="job-list">
           {% for job in jobs %}
           <li>
-            <a href="{{ url_for('job_detail', job_id=job.id, auth_token=auth_token) }}">{{ job.id[:8] }}</a>
+            <a href="{{ url_for('job_detail', job_id=job.job_id, auth_token=auth_token) }}">{{ job.job_id[:8] }}</a>
             <span class="status status-{{ job.status }}">{{ job.status }}</span>
-            <span>{{ job.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</span>
-            <span>ns={{ job.params.get('NAMESPACE', '-') }}</span>
-            <span>domain={{ job.params.get('DOMAIN') or '(autogenerado)' }}</span>
+            <span>{{ job.type }}</span>
+            <span>{{ job.created_at }}</span>
+            <span>site={{ job.site_id or '-' }}</span>
           </li>
           {% endfor %}
         </ul>

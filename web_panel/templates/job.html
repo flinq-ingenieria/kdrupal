@@ -3,8 +3,8 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Job {{ job.id[:8] }}</title>
-    {% if job.status == 'running' or job.status == 'queued' %}
+    <title>Job {{ job.job_id[:8] }}</title>
+    {% if job.status == 'running' %}
     <meta http-equiv="refresh" content="3" />
     {% endif %}
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
@@ -12,19 +12,20 @@
   <body>
     <main class="container">
       <p><a href="{{ url_for('index', auth_token=auth_token) }}">← Volver</a></p>
-      <h1>Job {{ job.id }}</h1>
+      <h1>Job {{ job.job_id }}</h1>
       <p>
         <span class="status status-{{ job.status }}">{{ job.status }}</span>
-        {% if job.return_code is not none %}
-        <span>exit={{ job.return_code }}</span>
-        {% endif %}
+        {% if job.return_code is not none %}<span>exit={{ job.return_code }}</span>{% endif %}
       </p>
-      <h2>Parámetros</h2>
-      <pre>{% for k, v in job.params.items() %}{{ k }}={{ v }}
-{% endfor %}</pre>
-
+      {% if site %}
+      <h2>Sitio</h2>
+      <pre>slug={{ site.slug }}
+namespace={{ site.namespace }}
+domain={{ site.domain }}
+status={{ site.status }}</pre>
+      {% endif %}
       <h2>Logs</h2>
-      <pre class="logs">{% for line in job.logs %}{{ line }}
+      <pre class="logs">{% for item in job.logs %}[{{ item.created_at }}] {{ item.line }}
 {% endfor %}</pre>
     </main>
   </body>

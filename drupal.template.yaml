@@ -247,6 +247,7 @@ spec:
             - /bin/sh
             - -ec
             - |
+              echo "memory_limit=1024M" > /usr/local/etc/php/conf.d/zz-memory-limit.ini
               apt-get update
               apt-get install -y --no-install-recommends git unzip curl ca-certificates
               rm -rf /var/lib/apt/lists/*
@@ -369,6 +370,7 @@ spec:
             - /bin/sh
             - -ec
             - |
+              echo "memory_limit=1024M" > /usr/local/etc/php/conf.d/zz-memory-limit.ini
               apt-get update
               apt-get install -y --no-install-recommends git unzip curl mariadb-client ca-certificates
               rm -rf /var/lib/apt/lists/*
@@ -385,7 +387,7 @@ spec:
               memory: "512Mi"
             limits:
               cpu: "4"
-              memory: "512Mi"
+              memory: "1Gi"
 
       volumes:
         - name: drupalcms-code

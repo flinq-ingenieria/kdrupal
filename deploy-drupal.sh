@@ -125,6 +125,12 @@ TLS_SECRET_NAME="$(echo "$DOMAIN" | tr '.' '-')-tls"
 
 # Escapar puntos del dominio para regex PHP
 DOMAIN_REGEX="$(echo "$DOMAIN" | sed 's/\./\\\\./g')"
+DOT_COUNT="$(awk -F. '{print NF-1}' <<< "$DOMAIN")"
+if [ "$DOT_COUNT" -eq 1 ]; then
+  INCLUDE_WWW=true
+else
+  INCLUDE_WWW=false
+fi
 
 if [ -t 0 ]; then
   DRUPAL_SITE_NAME="$(read_input_with_default "Nombre del sitio Drupal" "$DRUPAL_SITE_NAME")"
@@ -147,6 +153,7 @@ printf "  Admin user:       %s\n" "$DRUPAL_ADMIN_USER"
 printf "  Admin email:      %s\n" "$DRUPAL_ADMIN_EMAIL"
 printf "  Módulos:          %s\n" "$DRUPAL_ENABLE_MODULES"
 printf "  Timeout rollout:  %ss\n" "$DEPLOY_TIMEOUT_SECONDS"
+printf "  Incluir www:      %s\n" "$INCLUDE_WWW"
 echo ""
 
 if is_true "$AUTO_CONFIRM"; then
@@ -164,8 +171,18 @@ echo ""
 echo "Aplicando manifiestos..."
 
 # envsubst con lista explícita para no tocar variables de nginx ($uri, $query_string...)
+RENDERED_MANIFEST="$(mktemp)"
 envsubst '${NAMESPACE} ${DOMAIN} ${MARIADB_ROOT_PASSWORD} ${MARIADB_PASSWORD} ${DRUPAL_HASH_SALT} ${TLS_SECRET_NAME} ${DOMAIN_REGEX} ${DRUPAL_ADMIN_USER} ${DRUPAL_ADMIN_PASS} ${DRUPAL_ADMIN_EMAIL}' \
-  < "$TEMPLATE" | kubectl apply -f -
+  < "$TEMPLATE" > "$RENDERED_MANIFEST"
+
+if [ "$INCLUDE_WWW" = true ]; then
+  sed -i 's/[[:space:]]*#WWW_ONLY//g' "$RENDERED_MANIFEST"
+else
+  sed -i '/#WWW_ONLY/d' "$RENDERED_MANIFEST"
+fi
+
+kubectl apply -f "$RENDERED_MANIFEST"
+rm -f "$RENDERED_MANIFEST"
 
 CURRENT_STAGE="wait-rollouts"
 echo ""

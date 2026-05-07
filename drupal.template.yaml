@@ -28,7 +28,8 @@ data:
   default.conf: |
     server {
       listen 80;
-      server_name ${DOMAIN} www.${DOMAIN} _;
+      server_name ${DOMAIN} _;
+      server_name www.${DOMAIN}; #WWW_ONLY
       root /var/www/html/app/web;
       index index.php index.html;
 
@@ -286,7 +287,7 @@ spec:
 
               \$settings['trusted_host_patterns'] = [
                 '^${DOMAIN_REGEX}$',
-                '^www\\.${DOMAIN_REGEX}$',
+                '^www\\.${DOMAIN_REGEX}$', #WWW_ONLY
                 '^drupalcms$',
                 '^drupalcms\\.${NAMESPACE}\\.svc(\\.cluster\\.local)?$',
                 '^localhost$',
@@ -421,7 +422,7 @@ spec:
   tls:
     - hosts:
         - ${DOMAIN}
-        - www.${DOMAIN}
+        - www.${DOMAIN} #WWW_ONLY
       secretName: ${TLS_SECRET_NAME}
   rules:
     - host: ${DOMAIN}
@@ -434,13 +435,13 @@ spec:
                 name: drupalcms
                 port:
                   number: 80
-    - host: www.${DOMAIN}
-      http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: drupalcms
-                port:
-                  number: 80
+    - host: www.${DOMAIN} #WWW_ONLY
+      http: #WWW_ONLY
+        paths: #WWW_ONLY
+          - path: / #WWW_ONLY
+            pathType: Prefix #WWW_ONLY
+            backend: #WWW_ONLY
+              service: #WWW_ONLY
+                name: drupalcms #WWW_ONLY
+                port: #WWW_ONLY
+                  number: 80 #WWW_ONLY

@@ -15,6 +15,9 @@ stringData:
   mariadb-user: "drupal"
   mariadb-password: "${MARIADB_PASSWORD}"
   drupal-hash-salt: "${DRUPAL_HASH_SALT}"
+  drupal-admin-user: "${DRUPAL_ADMIN_USER}"
+  drupal-admin-pass: "${DRUPAL_ADMIN_PASS}"
+  drupal-admin-email: "${DRUPAL_ADMIN_EMAIL}"
 ---
 apiVersion: v1
 kind: ConfigMap

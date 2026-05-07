@@ -214,7 +214,7 @@ if [ -n "${DRUPAL_ENABLE_MODULES// /}" ]; then
   read -r -a MODULES <<< "$DRUPAL_ENABLE_MODULES"
   for module in "${MODULES[@]}"; do
     [ -n "$module" ] || continue
-    if run_as_www_data "cd /var/www/html/app && ./vendor/bin/drush php:eval \"echo \\Drupal::moduleHandler()->moduleExists('$module') ? '1' : '0';\"" | grep -Fxq 1; then
+    if run_as_www_data "cd /var/www/html/app && ./vendor/bin/drush pml --status=enabled --type=module --format=list" | grep -Fxq "$module"; then
       echo "  - $module: ya estaba habilitado"
     else
       echo "  - $module: habilitando"
@@ -241,7 +241,7 @@ kubectl -n "$NAMESPACE" rollout status deployment/drupalcms --timeout="${DEPLOY_
 run_as_www_data "cd /var/www/html/app && ./vendor/bin/drush status"
 
 if echo "$DRUPAL_ENABLE_MODULES" | tr ' ' '\n' | grep -Fxq "redirect"; then
-  if run_as_www_data "cd /var/www/html/app && ./vendor/bin/drush php:eval \"echo \\Drupal::moduleHandler()->moduleExists('redirect') ? '1' : '0';\"" | grep -Fxq 1; then
+  if run_as_www_data "cd /var/www/html/app && ./vendor/bin/drush pml --status=enabled --type=module --format=list" | grep -Fxq "redirect"; then
     echo "Verificación módulo redirect: habilitado."
   else
     echo "Aviso: módulo redirect no aparece habilitado tras el despliegue."

@@ -24,6 +24,7 @@ def create_app() -> Flask:
 
     panel_auth_token = os.getenv("PANEL_AUTH_TOKEN", "").strip()
     default_base_domain = os.getenv("DEFAULT_BASE_DOMAIN", "").strip()
+    default_admin_pass = os.getenv("DEFAULT_ADMIN_PASS", "").strip()
     namespace_prefix = os.getenv("NAMESPACE_PREFIX", "drupal-").strip()
     sqlite_path = os.getenv("SQLITE_PATH", str(Path(__file__).resolve().parent / "data" / "panel.db"))
     dinahosting_api_url = os.getenv("DINAHOSTING_API_URL", "").strip()
@@ -36,6 +37,8 @@ def create_app() -> Flask:
 
     if not default_base_domain:
         raise RuntimeError("DEFAULT_BASE_DOMAIN es obligatorio")
+    if not default_admin_pass:
+        raise RuntimeError("DEFAULT_ADMIN_PASS es obligatorio")
     if not dinahosting_api_url or not dinahosting_auth_user or not dinahosting_auth_pwd or not dinahosting_dns_target:
         raise RuntimeError("Faltan variables de Dinahosting obligatorias (URL, AUTH_USER, AUTH_PWD, DNS_TARGET)")
 
@@ -51,6 +54,7 @@ def create_app() -> Flask:
         dns=dns,
         namespace_prefix=namespace_prefix,
         default_base_domain=default_base_domain,
+        default_admin_pass=default_admin_pass,
         dns_target=dinahosting_dns_target,
         dns_ttl=dinahosting_dns_ttl,
     )
@@ -149,7 +153,6 @@ def create_app() -> Flask:
             "locale": request.form.get("locale", "es").strip(),
             "admin_user": request.form.get("admin_user", "admin").strip(),
             "admin_email": request.form.get("admin_email", "").strip(),
-            "admin_pass": request.form.get("admin_pass", "").strip(),
             "modules": request.form.get("modules", "redirect").strip(),
         }
 

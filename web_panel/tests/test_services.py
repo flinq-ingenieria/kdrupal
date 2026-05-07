@@ -80,6 +80,7 @@ def build_provisioner():
         dns=dns,
         namespace_prefix="drupal-",
         default_base_domain="example.com",
+        default_admin_pass="FixedPass123!",
         dns_target="203.0.113.10",
         dns_ttl=300,
     ), dns
@@ -96,7 +97,6 @@ def test_build_spec_generates_domain_if_missing():
             "locale": "es",
             "admin_user": "admin",
             "admin_email": "",
-            "admin_pass": "",
             "modules": "redirect path",
         },
         site_id="1",
@@ -104,6 +104,7 @@ def test_build_spec_generates_domain_if_missing():
     assert spec.namespace == "drupal-acme"
     assert spec.domain.endswith(".example.com")
     assert spec.modules == ["redirect", "path"]
+    assert spec.admin_password == "FixedPass123!"
 
 
 def test_provision_calls_dns_for_new_namespace():

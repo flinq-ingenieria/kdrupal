@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import re
 import secrets
-import string
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
@@ -46,11 +45,6 @@ def random_subdomain(base_domain: str) -> str:
 
 def random_hex(length: int) -> str:
     return secrets.token_hex(length // 2)
-
-
-def random_admin_password(length: int = 24) -> str:
-    alphabet = string.ascii_letters + string.digits
-    return "".join(secrets.choice(alphabet) for _ in range(length))
 
 
 @dataclass
@@ -337,6 +331,7 @@ class DrupalProvisioner:
         dns: DnsService,
         namespace_prefix: str,
         default_base_domain: str,
+        default_admin_pass: str,
         dns_target: str,
         dns_ttl: int,
     ) -> None:
@@ -344,6 +339,7 @@ class DrupalProvisioner:
         self.dns = dns
         self.namespace_prefix = namespace_prefix
         self.default_base_domain = default_base_domain
+        self.default_admin_pass = default_admin_pass
         self.dns_target = dns_target
         self.dns_ttl = dns_ttl
 
@@ -361,7 +357,7 @@ class DrupalProvisioner:
 
         admin_user = payload.get("admin_user", "admin").strip() or "admin"
         admin_email = payload.get("admin_email", "").strip() or f"admin@{domain}"
-        admin_password = payload.get("admin_pass", "").strip() or random_admin_password()
+        admin_password = self.default_admin_pass
         modules = [m for m in payload.get("modules", "redirect").split() if m]
 
         return SiteSpec(

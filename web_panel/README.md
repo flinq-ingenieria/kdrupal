@@ -6,6 +6,7 @@ Aplicación web Flask para crear/listar/eliminar sitios Drupal en Kubernetes sin
 
 - `PANEL_AUTH_TOKEN` (obligatoria)
 - `DEFAULT_BASE_DOMAIN` (obligatoria, usada para autogenerar dominio)
+- `DEFAULT_ADMIN_PASS` (obligatoria, password fijo del admin de Drupal)
 - `NAMESPACE_PREFIX` (opcional, por defecto `drupal-`)
 - `SQLITE_PATH` (opcional, por defecto `web_panel/data/panel.db`)
 - `DINAHOSTING_API_URL` (obligatoria)

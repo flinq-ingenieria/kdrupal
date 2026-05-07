@@ -67,6 +67,7 @@ fi
 
 DEPLOY_TIMEOUT_SECONDS="${DEPLOY_TIMEOUT_SECONDS:-900}"
 DRUPAL_SITE_NAME="${DRUPAL_SITE_NAME:-Mi Drupal}"
+DRUPAL_LOCALE="${DRUPAL_LOCALE:-es}"
 DRUPAL_ADMIN_USER="${DRUPAL_ADMIN_USER:-admin}"
 DRUPAL_ADMIN_EMAIL_DEFAULT="admin@${DOMAIN}"
 DRUPAL_ADMIN_EMAIL="${DRUPAL_ADMIN_EMAIL:-$DRUPAL_ADMIN_EMAIL_DEFAULT}"
@@ -127,6 +128,7 @@ DOMAIN_REGEX="$(echo "$DOMAIN" | sed 's/\./\\\\./g')"
 
 if [ -t 0 ]; then
   DRUPAL_SITE_NAME="$(read_input_with_default "Nombre del sitio Drupal" "$DRUPAL_SITE_NAME")"
+  DRUPAL_LOCALE="$(read_input_with_default "Locale Drupal (ej: es, en)" "$DRUPAL_LOCALE")"
   DRUPAL_ADMIN_USER="$(read_input_with_default "Usuario admin Drupal" "$DRUPAL_ADMIN_USER")"
   DRUPAL_ADMIN_EMAIL="$(read_input_with_default "Email admin Drupal" "$DRUPAL_ADMIN_EMAIL")"
   DRUPAL_ENABLE_MODULES="$(read_input_with_default "Módulos a habilitar (separados por espacio)" "$DRUPAL_ENABLE_MODULES")"
@@ -140,6 +142,7 @@ printf "  Dominio:          %s\n" "$DOMAIN"
 printf "  Namespace:        %s\n" "$NAMESPACE"
 printf "  TLS Secret:       %s\n" "$TLS_SECRET_NAME"
 printf "  Site name:        %s\n" "$DRUPAL_SITE_NAME"
+printf "  Locale:           %s\n" "$DRUPAL_LOCALE"
 printf "  Admin user:       %s\n" "$DRUPAL_ADMIN_USER"
 printf "  Admin email:      %s\n" "$DRUPAL_ADMIN_EMAIL"
 printf "  Módulos:          %s\n" "$DRUPAL_ENABLE_MODULES"
@@ -183,7 +186,7 @@ if kubectl -n "$NAMESPACE" exec "$TOOLS_POD" -c tools -- sh -lc "cd /var/www/htm
   kubectl -n "$NAMESPACE" exec "$TOOLS_POD" -c tools -- sh -lc "cd /var/www/html/app && ./vendor/bin/drush updb -y && ./vendor/bin/drush cr"
 else
   echo "Drupal no instalado. Ejecutando site-install..."
-  kubectl -n "$NAMESPACE" exec "$TOOLS_POD" -c tools -- sh -lc "cd /var/www/html/app && ./vendor/bin/drush site:install -y --site-name='$DRUPAL_SITE_NAME' --account-name='$DRUPAL_ADMIN_USER' --account-mail='$DRUPAL_ADMIN_EMAIL' --account-pass='$DRUPAL_ADMIN_PASS'"
+  kubectl -n "$NAMESPACE" exec "$TOOLS_POD" -c tools -- sh -lc "cd /var/www/html/app && ./vendor/bin/drush site:install -y --locale='$DRUPAL_LOCALE' --site-name='$DRUPAL_SITE_NAME' --account-name='$DRUPAL_ADMIN_USER' --account-mail='$DRUPAL_ADMIN_EMAIL' --account-pass='$DRUPAL_ADMIN_PASS'"
 fi
 
 if [ -n "${DRUPAL_ENABLE_MODULES// /}" ]; then
@@ -192,11 +195,19 @@ if [ -n "${DRUPAL_ENABLE_MODULES// /}" ]; then
   read -r -a MODULES <<< "$DRUPAL_ENABLE_MODULES"
   for module in "${MODULES[@]}"; do
     [ -n "$module" ] || continue
-    if kubectl -n "$NAMESPACE" exec "$TOOLS_POD" -c tools -- sh -lc "cd /var/www/html/app && ./vendor/bin/drush pml --status=enabled --type=module --no-core --format=list | grep -Fxq '$module'"; then
+    if kubectl -n "$NAMESPACE" exec "$TOOLS_POD" -c tools -- sh -lc "cd /var/www/html/app && ./vendor/bin/drush php:eval \"echo \\Drupal::moduleHandler()->moduleExists('$module') ? '1' : '0';\" | grep -Fxq 1"; then
       echo "  - $module: ya estaba habilitado"
     else
       echo "  - $module: habilitando"
-      kubectl -n "$NAMESPACE" exec "$TOOLS_POD" -c tools -- sh -lc "cd /var/www/html/app && ./vendor/bin/drush en -y '$module'"
+      if ! kubectl -n "$NAMESPACE" exec "$TOOLS_POD" -c tools -- sh -lc "cd /var/www/html/app && ./vendor/bin/drush en -y '$module'" 2>/tmp/drush-en-error.log; then
+        if grep -q "PreExistingConfigException" /tmp/drush-en-error.log; then
+          echo "  - $module: configuración preexistente detectada, se continúa como idempotente"
+          kubectl -n "$NAMESPACE" exec "$TOOLS_POD" -c tools -- sh -lc "cd /var/www/html/app && ./vendor/bin/drush cr"
+        else
+          cat /tmp/drush-en-error.log >&2
+          exit 1
+        fi
+      fi
     fi
   done
 fi

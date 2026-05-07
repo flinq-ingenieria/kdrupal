@@ -238,7 +238,11 @@ if [ -n "${DRUPAL_ENABLE_MODULES// /}" ]; then
       if ! run_as_www_data "cd /var/www/html/app && ./vendor/bin/drush en -y '$module'" 2>/tmp/drush-en-error.log; then
         if grep -q "PreExistingConfigException" /tmp/drush-en-error.log; then
           echo "  - $module: configuración preexistente detectada, se continúa como idempotente"
-          run_as_www_data "cd /var/www/html/app && ./vendor/bin/drush cr"
+          if run_as_www_data "cd /var/www/html/app && ./vendor/bin/drush pml --status=enabled --type=module --format=list" | grep -Fxq "$module"; then
+            echo "  - $module: aparece como habilitado tras el conflicto de configuración"
+          else
+            echo "  - $module: no quedó habilitado; se continúa sin forzar cache-rebuild"
+          fi
         else
           cat /tmp/drush-en-error.log >&2
           exit 1

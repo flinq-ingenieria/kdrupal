@@ -14,6 +14,7 @@
       <section class="card">
         <h2>Nuevo despliegue</h2>
         <form action="/deploy" method="post" class="form-grid">
+          <label>Token panel* <input name="auth_token" required value="{{ auth_token }}" /></label>
           <label>Namespace* <input name="namespace" required /></label>
           <label>Dominio (opcional) <input name="domain" placeholder="example.com" /></label>
           <label>Base domain (si no hay dominio) <input name="base_domain" placeholder="example.com" /></label>
@@ -27,6 +28,7 @@
           <label>DNS target (opcional) <input name="dns_target" /></label>
           <label>DNS ttl (opcional) <input name="dns_ttl" value="300" /></label>
           <label>DNS provider (opcional) <input name="dns_provider" value="placeholder" /></label>
+          <label>DNS auth token (opcional) <input name="dns_auth_token" /></label>
           <button type="submit">Desplegar</button>
         </form>
       </section>
@@ -37,7 +39,7 @@
         <ul class="job-list">
           {% for job in jobs %}
           <li>
-            <a href="{{ url_for('job_detail', job_id=job.id) }}">{{ job.id[:8] }}</a>
+            <a href="{{ url_for('job_detail', job_id=job.id, auth_token=auth_token) }}">{{ job.id[:8] }}</a>
             <span class="status status-{{ job.status }}">{{ job.status }}</span>
             <span>{{ job.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</span>
             <span>ns={{ job.params.get('NAMESPACE', '-') }}</span>

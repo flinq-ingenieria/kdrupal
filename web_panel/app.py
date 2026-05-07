@@ -13,6 +13,7 @@ from flask import Flask, abort, redirect, render_template, request, url_for
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 SCRIPT_PATH = BASE_DIR / "deploy-drupal.sh"
+PANEL_AUTH_TOKEN = os.getenv("PANEL_AUTH_TOKEN", "").strip()
 
 app = Flask(__name__)
 
@@ -31,8 +32,24 @@ jobs: dict[str, DeploymentJob] = {}
 jobs_lock = threading.Lock()
 
 
-def parse_bool(value: str | None) -> str:
-    return "true" if value else "false"
+def extract_request_token() -> str:
+    bearer = request.headers.get("Authorization", "")
+    if bearer.startswith("Bearer "):
+        return bearer[7:].strip()
+    return (
+        request.headers.get("X-Auth-Token", "").strip()
+        or request.values.get("auth_token", "").strip()
+    )
+
+
+@app.before_request
+def require_token() -> None:
+    if request.endpoint == "static":
+        return
+    if not PANEL_AUTH_TOKEN:
+        abort(500, "Falta configurar PANEL_AUTH_TOKEN en el entorno")
+    if extract_request_token() != PANEL_AUTH_TOKEN:
+        abort(401, "No autorizado")
 
 
 def append_log(job: DeploymentJob, line: str) -> None:
@@ -76,7 +93,7 @@ def run_job(job_id: str) -> None:
 def index() -> str:
     with jobs_lock:
         recent_jobs = sorted(jobs.values(), key=lambda j: j.created_at, reverse=True)
-    return render_template("index.html", jobs=recent_jobs)
+    return render_template("index.html", jobs=recent_jobs, auth_token=extract_request_token())
 
 
 @app.post("/deploy")
@@ -115,6 +132,8 @@ def deploy() -> Any:
         params["DNS_TTL"] = request.form.get("dns_ttl", "").strip()
     if request.form.get("dns_provider", "").strip():
         params["DNS_PROVIDER"] = request.form.get("dns_provider", "").strip()
+    if request.form.get("dns_auth_token", "").strip():
+        params["DNS_AUTH_TOKEN"] = request.form.get("dns_auth_token", "").strip()
 
     params = {k: v for k, v in params.items() if v != ""}
 
@@ -127,7 +146,7 @@ def deploy() -> Any:
     thread = threading.Thread(target=run_job, args=(job_id,), daemon=True)
     thread.start()
 
-    return redirect(url_for("job_detail", job_id=job_id))
+    return redirect(url_for("job_detail", job_id=job_id, auth_token=extract_request_token()))
 
 
 @app.get("/jobs/<job_id>")
@@ -137,7 +156,7 @@ def job_detail(job_id: str) -> str:
     if not job:
         abort(404)
 
-    return render_template("job.html", job=job)
+    return render_template("job.html", job=job, auth_token=extract_request_token())
 
 
 if __name__ == "__main__":

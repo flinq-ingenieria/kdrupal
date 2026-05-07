@@ -44,12 +44,13 @@ generate_random_subdomain() {
 
 provision_dns_record_placeholder() {
   local fqdn="$1"
-  local target="$2"
-  local ttl="$3"
+  local auth_token="$2"
+  local target="$3"
+  local ttl="$4"
 
   echo "DNS provider placeholder no implementado."
   echo "Implementa esta función para crear el registro DNS del host '$fqdn'."
-  echo "Entradas esperadas -> provider: ${DNS_PROVIDER:-<dns-provider>}, target: ${target:-<ip-o-cname>}, ttl: ${ttl}"
+  echo "Entradas esperadas -> provider: ${DNS_PROVIDER:-<dns-provider>}, token: ${auth_token:+***}, target: ${target:-<ip-o-cname>}, ttl: ${ttl}"
   return 1
 }
 
@@ -70,6 +71,7 @@ BASE_DOMAIN="${BASE_DOMAIN:-}"
 DNS_TARGET="${DNS_TARGET:-}"
 DNS_TTL="${DNS_TTL:-300}"
 DNS_PROVIDER="${DNS_PROVIDER:-placeholder}"
+DNS_AUTH_TOKEN="${DNS_AUTH_TOKEN:-}"
 if [ -z "$DOMAIN" ]; then
   read -rp "Dominio (ej: example.com) [vacío para autogenerar]: " DOMAIN
 fi
@@ -212,7 +214,7 @@ echo "Aplicando manifiestos..."
 if [ "$DOMAIN_SOURCE" = "generated" ]; then
   CURRENT_STAGE="dns-provisioning"
   echo "Provisionando DNS para dominio autogenerado..."
-  if ! provision_dns_record_placeholder "$DOMAIN" "$DNS_TARGET" "$DNS_TTL"; then
+  if ! provision_dns_record_placeholder "$DOMAIN" "$DNS_AUTH_TOKEN" "$DNS_TARGET" "$DNS_TTL"; then
     echo "Error: no se pudo provisionar DNS para '$DOMAIN'."
     echo "Implementa la integración del proveedor DNS en provision_dns_record_placeholder()."
     exit 1

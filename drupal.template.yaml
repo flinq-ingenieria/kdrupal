@@ -351,6 +351,14 @@ spec:
           image: drupal:11.3.8-php8.4-fpm-bookworm
           imagePullPolicy: IfNotPresent
           workingDir: /var/www/html/app
+          command:
+            - /bin/sh
+            - -ec
+            - |
+              apt-get update
+              apt-get install -y --no-install-recommends rsync
+              rm -rf /var/lib/apt/lists/*
+              exec php-fpm
           volumeMounts:
             - name: drupalcms-code
               mountPath: /var/www/html

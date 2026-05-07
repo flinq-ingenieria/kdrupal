@@ -181,12 +181,31 @@ echo "Ejecutando bootstrap idempotente de Drupal..."
 TOOLS_POD="$(kubectl -n "$NAMESPACE" get pod -l app=drupalcms -o jsonpath='{.items[0].metadata.name}')"
 [ -n "$TOOLS_POD" ] || { echo "Error: no se encontró pod de drupalcms"; exit 1; }
 
-if kubectl -n "$NAMESPACE" exec "$TOOLS_POD" -c tools -- sh -lc "cd /var/www/html/app && ./vendor/bin/drush status --fields=bootstrap --format=list 2>/dev/null | grep -qi 'Successful'"; then
+run_as_www_data() {
+  local inner_cmd="$1"
+  kubectl -n "$NAMESPACE" exec "$TOOLS_POD" -c tools -- sh -lc \
+    "su -s /bin/sh www-data -c \"${inner_cmd}\""
+}
+
+fix_public_permissions() {
+  kubectl -n "$NAMESPACE" exec "$TOOLS_POD" -c tools -- sh -lc '
+    set -e
+    mkdir -p /var/www/html/app/web/sites/default/files
+    chown -R www-data:www-data /var/www/html/app/web/sites/default/files
+    find /var/www/html/app/web/sites/default/files -type d -exec chmod 2775 {} \;
+    find /var/www/html/app/web/sites/default/files -type f -exec chmod 0664 {} \;
+  '
+}
+
+fix_public_permissions
+
+if run_as_www_data "cd /var/www/html/app && ./vendor/bin/drush status --fields=bootstrap --format=list 2>/dev/null" | grep -qi 'Successful'; then
   echo "Drupal ya instalado. Ejecutando tareas de mantenimiento seguras..."
-  kubectl -n "$NAMESPACE" exec "$TOOLS_POD" -c tools -- sh -lc "cd /var/www/html/app && ./vendor/bin/drush updb -y && ./vendor/bin/drush cr"
+  run_as_www_data "cd /var/www/html/app && ./vendor/bin/drush updb -y"
+  run_as_www_data "cd /var/www/html/app && ./vendor/bin/drush cr"
 else
   echo "Drupal no instalado. Ejecutando site-install..."
-  kubectl -n "$NAMESPACE" exec "$TOOLS_POD" -c tools -- sh -lc "cd /var/www/html/app && ./vendor/bin/drush site:install -y --locale='$DRUPAL_LOCALE' --site-name='$DRUPAL_SITE_NAME' --account-name='$DRUPAL_ADMIN_USER' --account-mail='$DRUPAL_ADMIN_EMAIL' --account-pass='$DRUPAL_ADMIN_PASS'"
+  run_as_www_data "cd /var/www/html/app && ./vendor/bin/drush site:install -y --locale='$DRUPAL_LOCALE' --site-name='$DRUPAL_SITE_NAME' --account-name='$DRUPAL_ADMIN_USER' --account-mail='$DRUPAL_ADMIN_EMAIL' --account-pass='$DRUPAL_ADMIN_PASS'"
 fi
 
 if [ -n "${DRUPAL_ENABLE_MODULES// /}" ]; then
@@ -195,14 +214,14 @@ if [ -n "${DRUPAL_ENABLE_MODULES// /}" ]; then
   read -r -a MODULES <<< "$DRUPAL_ENABLE_MODULES"
   for module in "${MODULES[@]}"; do
     [ -n "$module" ] || continue
-    if kubectl -n "$NAMESPACE" exec "$TOOLS_POD" -c tools -- sh -lc "cd /var/www/html/app && ./vendor/bin/drush php:eval \"echo \\Drupal::moduleHandler()->moduleExists('$module') ? '1' : '0';\" | grep -Fxq 1"; then
+    if run_as_www_data "cd /var/www/html/app && ./vendor/bin/drush php:eval \"echo \\Drupal::moduleHandler()->moduleExists('$module') ? '1' : '0';\"" | grep -Fxq 1; then
       echo "  - $module: ya estaba habilitado"
     else
       echo "  - $module: habilitando"
-      if ! kubectl -n "$NAMESPACE" exec "$TOOLS_POD" -c tools -- sh -lc "cd /var/www/html/app && ./vendor/bin/drush en -y '$module'" 2>/tmp/drush-en-error.log; then
+      if ! run_as_www_data "cd /var/www/html/app && ./vendor/bin/drush en -y '$module'" 2>/tmp/drush-en-error.log; then
         if grep -q "PreExistingConfigException" /tmp/drush-en-error.log; then
           echo "  - $module: configuración preexistente detectada, se continúa como idempotente"
-          kubectl -n "$NAMESPACE" exec "$TOOLS_POD" -c tools -- sh -lc "cd /var/www/html/app && ./vendor/bin/drush cr"
+          run_as_www_data "cd /var/www/html/app && ./vendor/bin/drush cr"
         else
           cat /tmp/drush-en-error.log >&2
           exit 1
@@ -212,15 +231,17 @@ if [ -n "${DRUPAL_ENABLE_MODULES// /}" ]; then
   done
 fi
 
+fix_public_permissions
+
 CURRENT_STAGE="final-verification"
 echo ""
 echo "Verificación final..."
 kubectl -n "$NAMESPACE" rollout status statefulset/mariadb --timeout="${DEPLOY_TIMEOUT_SECONDS}s" >/dev/null
 kubectl -n "$NAMESPACE" rollout status deployment/drupalcms --timeout="${DEPLOY_TIMEOUT_SECONDS}s" >/dev/null
-kubectl -n "$NAMESPACE" exec "$TOOLS_POD" -c tools -- sh -lc "cd /var/www/html/app && ./vendor/bin/drush status"
+run_as_www_data "cd /var/www/html/app && ./vendor/bin/drush status"
 
 if echo "$DRUPAL_ENABLE_MODULES" | tr ' ' '\n' | grep -Fxq "redirect"; then
-  if kubectl -n "$NAMESPACE" exec "$TOOLS_POD" -c tools -- sh -lc "cd /var/www/html/app && ./vendor/bin/drush php:eval \"echo \\Drupal::moduleHandler()->moduleExists('redirect') ? '1' : '0';\" | grep -Fxq 1"; then
+  if run_as_www_data "cd /var/www/html/app && ./vendor/bin/drush php:eval \"echo \\Drupal::moduleHandler()->moduleExists('redirect') ? '1' : '0';\"" | grep -Fxq 1; then
     echo "Verificación módulo redirect: habilitado."
   else
     echo "Aviso: módulo redirect no aparece habilitado tras el despliegue."

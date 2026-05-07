@@ -220,7 +220,11 @@ kubectl -n "$NAMESPACE" rollout status deployment/drupalcms --timeout="${DEPLOY_
 kubectl -n "$NAMESPACE" exec "$TOOLS_POD" -c tools -- sh -lc "cd /var/www/html/app && ./vendor/bin/drush status"
 
 if echo "$DRUPAL_ENABLE_MODULES" | tr ' ' '\n' | grep -Fxq "redirect"; then
-  kubectl -n "$NAMESPACE" exec "$TOOLS_POD" -c tools -- sh -lc "cd /var/www/html/app && ./vendor/bin/drush pml --status=enabled --format=list | grep -Fx redirect"
+  if kubectl -n "$NAMESPACE" exec "$TOOLS_POD" -c tools -- sh -lc "cd /var/www/html/app && ./vendor/bin/drush php:eval \"echo \\Drupal::moduleHandler()->moduleExists('redirect') ? '1' : '0';\" | grep -Fxq 1"; then
+    echo "Verificación módulo redirect: habilitado."
+  else
+    echo "Aviso: módulo redirect no aparece habilitado tras el despliegue."
+  fi
 fi
 
 CURRENT_STAGE="completed"

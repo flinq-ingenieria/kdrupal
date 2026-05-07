@@ -320,8 +320,14 @@ class K8sService:
         log("Bootstrap Drupal completado")
 
     def delete_namespace(self, namespace: str, log: LogFn) -> None:
-        self.core.delete_namespace(namespace)
-        log(f"Namespace {namespace} eliminado")
+        try:
+            self.core.delete_namespace(namespace)
+            log(f"Namespace {namespace} eliminado")
+        except self._api_exception as exc:
+            if exc.status == 404:
+                log(f"Namespace {namespace} no existe (borrado idempotente)")
+                return
+            raise
 
 
 class DrupalProvisioner:

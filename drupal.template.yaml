@@ -50,6 +50,14 @@ data:
         try_files $uri /index.php?$query_string;
       }
 
+      # Drupal puede regenerar agregados CSS/JS on-demand cuando no existen.
+      # Si damos 404 aquí, algunos assets nunca se recrean tras cache clear.
+      location ~* ^/sites/.*/files/(css|js|styles)/ {
+        try_files $uri /index.php?$query_string;
+        expires max;
+        log_not_found off;
+      }
+
       location ~ \.php$ {
         try_files $uri =404;
         include fastcgi_params;
@@ -182,11 +190,11 @@ spec:
             failureThreshold: 6
           resources:
             requests:
-              cpu: "250m"
-              memory: "512Mi"
+              cpu: "100m"
+              memory: "256Mi"
             limits:
-              cpu: "4"
-              memory: "1Gi"
+              cpu: "1"
+              memory: "768Mi"
       volumes:
         - name: mariadb-data
           persistentVolumeClaim:
@@ -307,11 +315,11 @@ spec:
               mountPath: /var/www/html
           resources:
             requests:
-              cpu: "500m"
-              memory: "1Gi"
+              cpu: "150m"
+              memory: "384Mi"
             limits:
-              cpu: "4"
-              memory: "3Gi"
+              cpu: "2"
+              memory: "1Gi"
 
       containers:
         - name: nginx
@@ -362,11 +370,11 @@ spec:
               mountPath: /var/www/html
           resources:
             requests:
-              cpu: "250m"
-              memory: "512Mi"
+              cpu: "100m"
+              memory: "256Mi"
             limits:
-              cpu: "4"
-              memory: "1Gi"
+              cpu: "2"
+              memory: "768Mi"
 
         - name: tools
           image: drupal:11.3.8-php8.4-fpm-bookworm
@@ -389,11 +397,11 @@ spec:
               mountPath: /var/www/html
           resources:
             requests:
-              cpu: "50m"
-              memory: "512Mi"
+              cpu: "25m"
+              memory: "128Mi"
             limits:
-              cpu: "4"
-              memory: "1Gi"
+              cpu: "1"
+              memory: "512Mi"
 
       volumes:
         - name: drupalcms-code

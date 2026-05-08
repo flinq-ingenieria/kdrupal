@@ -11,7 +11,7 @@
   </head>
   <body>
     <main class="container">
-      <p><a href="{{ url_for('index', auth_token=auth_token) }}">← Volver</a></p>
+      <p><a href="{{ url_for('index') }}">← Volver</a></p>
       <h1>Job {{ job.job_id }}</h1>
       <p>
         <span class="status status-{{ job.status }}">{{ job.status }}</span>

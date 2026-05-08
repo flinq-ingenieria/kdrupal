@@ -4,7 +4,6 @@ Aplicación web Flask para crear/listar/eliminar sitios Drupal en Kubernetes sin
 
 ## Variables de entorno
 
-- `PANEL_AUTH_TOKEN` (obligatoria)
 - `DEFAULT_BASE_DOMAIN` (obligatoria, usada para autogenerar dominio)
 - `DEFAULT_ADMIN_PASS` (obligatoria, password fijo del admin de Drupal)
 - `NAMESPACE_PREFIX` (opcional, por defecto `drupal-`)
@@ -35,13 +34,15 @@ python app.py
 
 Abrir:
 
-`http://localhost:8080/?auth_token=cambia-este-token`
+`http://localhost:8080/`
 
 ## Endpoints
 
 - `GET /` dashboard (crear/listar/eliminar)
 - `POST /sites` crear sitio
-- `POST /sites/<site_id>/delete` eliminar sitio completo (confirmación por slug)
+- `POST /sites/<site_id>/start` arrancar sitio (scale replicas 1)
+- `POST /sites/<site_id>/stop` detener sitio (scale replicas 0)
+- `POST /sites/<site_id>/delete` eliminar sitio completo (confirmación por diálogo)
 - `GET /jobs/<job_id>` estado y logs
 
 

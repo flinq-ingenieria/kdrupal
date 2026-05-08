@@ -14,7 +14,6 @@
       <section class="card">
         <h2>Crear Sitio</h2>
         <form action="/sites" method="post" class="form-grid">
-          <label>Token panel* <input name="auth_token" required value="{{ auth_token }}" /></label>
           <label>Site slug* <input name="site_slug" required placeholder="cliente-a" /></label>
           <label>Dominio/Subdominio (opcional) <input name="domain" placeholder="drupal.tudominio.com" /></label>
           <label>WWW
@@ -34,7 +33,7 @@
         <table>
           <thead>
             <tr>
-              <th>Slug</th><th>Namespace</th><th>Domain</th><th>Status</th><th>Creado</th><th>Eliminar</th>
+              <th>Slug</th><th>Namespace</th><th>Domain</th><th>Status</th><th>Creado</th><th>Acciones</th>
             </tr>
           </thead>
           <tbody>
@@ -47,9 +46,14 @@
               <td>{{ s.created_at }}</td>
               <td>
                 {% if not s.deleted_at %}
-                <form action="{{ url_for('delete_site', site_id=s.site_id) }}" method="post" class="inline-delete">
-                  <input type="hidden" name="auth_token" value="{{ auth_token }}" />
-                  <input name="confirm_slug" placeholder="{{ s.slug }}" required />
+                <form action="{{ url_for('start_site', site_id=s.site_id) }}" method="post" class="inline-delete">
+                  <button type="submit">Arrancar</button>
+                </form>
+                <form action="{{ url_for('stop_site', site_id=s.site_id) }}" method="post" class="inline-delete">
+                  <button type="submit">Detener</button>
+                </form>
+                <form action="{{ url_for('delete_site', site_id=s.site_id) }}" method="post" class="inline-delete"
+                      onsubmit="return confirm('¿Seguro que quieres eliminar el sitio {{ s.slug }}? Esta acción borrará namespace y DNS.');">
                   <button type="submit">Eliminar</button>
                 </form>
                 {% else %}
@@ -71,7 +75,7 @@
         <ul class="job-list">
           {% for job in jobs %}
           <li>
-            <a href="{{ url_for('job_detail', job_id=job.job_id, auth_token=auth_token) }}">{{ job.job_id[:8] }}</a>
+            <a href="{{ url_for('job_detail', job_id=job.job_id) }}">{{ job.job_id[:8] }}</a>
             <span class="status status-{{ job.status }}">{{ job.status }}</span>
             <span>{{ job.type }}</span>
             <span>{{ job.created_at }}</span>

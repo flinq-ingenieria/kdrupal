@@ -300,6 +300,21 @@ class K8sService:
                 return
             raise
 
+    def scale_site(self, namespace: str, running: bool, log: LogFn) -> None:
+        replicas = 1 if running else 0
+        self.apps.patch_namespaced_deployment_scale(
+            name="drupalcms",
+            namespace=namespace,
+            body={"spec": {"replicas": replicas}},
+        )
+        self.apps.patch_namespaced_stateful_set_scale(
+            name="mariadb",
+            namespace=namespace,
+            body={"spec": {"replicas": replicas}},
+        )
+        state = "arrancado" if running else "detenido"
+        log(f"Escala aplicada: drupalcms={replicas}, mariadb={replicas} ({state})")
+
 
 class DrupalProvisioner:
     def __init__(
@@ -426,3 +441,8 @@ class DrupalProvisioner:
             raise ServiceError(f"Namespace fuera de prefijo gestionado: {namespace}")
         self.k8s.delete_namespace(namespace, log)
         self.dns.delete_record(domain, self.dns_target, log)
+
+    def set_site_running(self, namespace: str, running: bool, log: LogFn) -> None:
+        if not namespace.startswith(self.namespace_prefix):
+            raise ServiceError(f"Namespace fuera de prefijo gestionado: {namespace}")
+        self.k8s.scale_site(namespace, running, log)

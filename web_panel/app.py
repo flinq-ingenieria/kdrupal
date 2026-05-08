@@ -23,7 +23,6 @@ load_dotenv(Path(__file__).resolve().parent / ".env")
 def create_app() -> Flask:
     app = Flask(__name__)
 
-    panel_auth_token = os.getenv("PANEL_AUTH_TOKEN", "").strip()
     default_base_domain = os.getenv("DEFAULT_BASE_DOMAIN", "").strip()
     default_admin_pass = os.getenv("DEFAULT_ADMIN_PASS", "pending-wizard").strip() or "pending-wizard"
     namespace_prefix = os.getenv("NAMESPACE_PREFIX", "drupal-").strip()
@@ -73,21 +72,6 @@ def create_app() -> Flask:
         dns_target=dinahosting_dns_target,
         dns_ttl=dinahosting_dns_ttl,
     )
-
-    def extract_request_token() -> str:
-        bearer = request.headers.get("Authorization", "")
-        if bearer.startswith("Bearer "):
-            return bearer[7:].strip()
-        return request.headers.get("X-Auth-Token", "").strip() or request.values.get("auth_token", "").strip()
-
-    @app.before_request
-    def require_token() -> None:
-        if request.endpoint == "static":
-            return
-        if not panel_auth_token:
-            abort(500, "Falta configurar PANEL_AUTH_TOKEN en el entorno")
-        if extract_request_token() != panel_auth_token:
-            abort(401, "No autorizado")
 
     def append_log(job_id: str, line: str) -> None:
         db.append_job_log(job_id, line)
@@ -139,6 +123,23 @@ def create_app() -> Flask:
             db.update_site_status(site_id, "delete_failed")
             db.update_job(job_id, "failed", 1)
 
+    def run_scale_job(job_id: str, site_id: str, running: bool) -> None:
+        site = db.get_site(site_id)
+        if not site:
+            db.append_job_log(job_id, "ERROR: site no encontrado")
+            db.update_job(job_id, "failed", 1)
+            return
+        try:
+            target_status = "active" if running else "stopped"
+            db.update_site_status(site_id, "starting" if running else "stopping")
+            provisioner.set_site_running(site["namespace"], running, lambda msg: append_log(job_id, msg))
+            db.update_site_status(site_id, target_status)
+            db.update_job(job_id, "success", 0)
+        except Exception as exc:
+            append_log(job_id, f"ERROR: {exc}")
+            db.update_site_status(site_id, "scale_failed")
+            db.update_job(job_id, "failed", 1)
+
     @app.get("/")
     def index() -> str:
         sites = db.list_sites()
@@ -147,7 +148,6 @@ def create_app() -> Flask:
             "index.html",
             sites=sites,
             jobs=jobs,
-            auth_token=extract_request_token(),
             namespace_prefix=namespace_prefix,
             default_base_domain=default_base_domain,
         )
@@ -184,17 +184,13 @@ def create_app() -> Flask:
         thread = threading.Thread(target=run_create_job, args=(job_id, site_id, payload), daemon=True)
         thread.start()
 
-        return redirect(url_for("job_detail", job_id=job_id, auth_token=extract_request_token()))
+        return redirect(url_for("job_detail", job_id=job_id))
 
     @app.post("/sites/<site_id>/delete")
     def delete_site(site_id: str) -> Any:
         site = db.get_site(site_id)
         if not site:
             abort(404)
-
-        confirmation = request.form.get("confirm_slug", "").strip()
-        if confirmation != site["slug"]:
-            abort(400, "Confirmación inválida: debes escribir el slug exacto")
 
         if not site["namespace"].startswith(namespace_prefix):
             abort(400, "El sitio no pertenece al prefijo gestionado")
@@ -215,7 +211,55 @@ def create_app() -> Flask:
         thread = threading.Thread(target=run_delete_job, args=(job_id, site_id), daemon=True)
         thread.start()
 
-        return redirect(url_for("job_detail", job_id=job_id, auth_token=extract_request_token()))
+        return redirect(url_for("job_detail", job_id=job_id))
+
+    @app.post("/sites/<site_id>/stop")
+    def stop_site(site_id: str) -> Any:
+        site = db.get_site(site_id)
+        if not site:
+            abort(404)
+        if not site["namespace"].startswith(namespace_prefix):
+            abort(400, "El sitio no pertenece al prefijo gestionado")
+
+        job_id = str(uuid.uuid4())
+        db.insert_job(
+            {
+                "job_id": job_id,
+                "site_id": site_id,
+                "type": "stop",
+                "status": "running",
+                "return_code": None,
+                "created_at": Database.utcnow(),
+                "finished_at": None,
+            }
+        )
+        thread = threading.Thread(target=run_scale_job, args=(job_id, site_id, False), daemon=True)
+        thread.start()
+        return redirect(url_for("job_detail", job_id=job_id))
+
+    @app.post("/sites/<site_id>/start")
+    def start_site(site_id: str) -> Any:
+        site = db.get_site(site_id)
+        if not site:
+            abort(404)
+        if not site["namespace"].startswith(namespace_prefix):
+            abort(400, "El sitio no pertenece al prefijo gestionado")
+
+        job_id = str(uuid.uuid4())
+        db.insert_job(
+            {
+                "job_id": job_id,
+                "site_id": site_id,
+                "type": "start",
+                "status": "running",
+                "return_code": None,
+                "created_at": Database.utcnow(),
+                "finished_at": None,
+            }
+        )
+        thread = threading.Thread(target=run_scale_job, args=(job_id, site_id, True), daemon=True)
+        thread.start()
+        return redirect(url_for("job_detail", job_id=job_id))
 
     @app.get("/jobs/<job_id>")
     def job_detail(job_id: str) -> str:
@@ -244,7 +288,6 @@ def create_app() -> Flask:
             job=job,
             site=site,
             db_info=db_info,
-            auth_token=extract_request_token(),
         )
 
     @app.errorhandler(ServiceError)

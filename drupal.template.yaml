@@ -301,7 +301,7 @@ spec:
               chmod 644 /var/www/html/app/web/sites/default/settings.php
           volumeMounts:
             - name: drupalcms-code
-              mountPath: /var/www/html
+              mountPath: /var/www/html/app/web/sites/default
           resources:
             requests:
               cpu: "150m"
@@ -319,7 +319,7 @@ spec:
               containerPort: 80
           volumeMounts:
             - name: drupalcms-code
-              mountPath: /var/www/html
+              mountPath: /var/www/html/app/web/sites/default
             - name: nginx-config
               mountPath: /etc/nginx/conf.d/default.conf
               subPath: default.conf
@@ -356,7 +356,7 @@ spec:
               exec php-fpm
           volumeMounts:
             - name: drupalcms-code
-              mountPath: /var/www/html
+              mountPath: /var/www/html/app/web/sites/default
           resources:
             requests:
               cpu: "100m"
@@ -377,7 +377,7 @@ spec:
               sleep infinity
           volumeMounts:
             - name: drupalcms-code
-              mountPath: /var/www/html
+              mountPath: /var/www/html/app/web/sites/default
           resources:
             requests:
               cpu: "25m"

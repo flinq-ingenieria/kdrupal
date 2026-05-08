@@ -1,0 +1,5 @@
+name: KDrupal Installer Fix
+type: module
+description: Runs a one-time post-install repair after the Drupal CMS wizard finishes.
+package: KDrupal
+core_version_requirement: ^11

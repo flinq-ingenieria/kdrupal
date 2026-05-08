@@ -1,0 +1,11 @@
+services:
+  kdrupal_installer_fix.post_install_repair:
+    class: Drupal\kdrupal_installer_fix\EventSubscriber\PostInstallRepairSubscriber
+    arguments:
+      - '@state'
+      - '@module_installer'
+      - '@module_handler'
+      - '@extension.list.module'
+      - '@logger.factory'
+    tags:
+      - { name: event_subscriber }

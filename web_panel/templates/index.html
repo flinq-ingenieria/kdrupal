@@ -8,8 +8,12 @@
   </head>
   <body>
     <main class="container">
-      <h1>Drupal Cluster Manager</h1>
-      <p>Namespaces gestionados con prefijo <code>{{ namespace_prefix }}</code>. Si no informas dominio, se genera bajo <code>{{ default_base_domain }}</code>.</p>
+      <header class="page-header">
+        <div>
+          <h1>Drupal Cluster Manager</h1>
+          <p>Namespaces <code>{{ namespace_prefix }}</code>. Dominios automáticos bajo <code>{{ default_base_domain }}</code>.</p>
+        </div>
+      </header>
 
       <section class="card">
         <h2>Crear Sitio</h2>
@@ -39,23 +43,28 @@
           <tbody>
           {% for s in sites %}
             <tr>
-              <td>{{ s.slug }}</td>
+              <td><strong>{{ s.slug }}</strong></td>
               <td><code>{{ s.namespace }}</code></td>
-              <td>{{ s.domain }}</td>
-              <td>{{ s.status }}</td>
+              <td><a href="https://{{ s.domain }}" target="_blank" rel="noreferrer">{{ s.domain }}</a></td>
+              <td><span class="status status-{{ s.status }}">{{ s.status }}</span></td>
               <td>{{ s.created_at }}</td>
               <td>
                 {% if not s.deleted_at %}
-                <form action="{{ url_for('start_site', site_id=s.site_id) }}" method="post" class="inline-delete">
-                  <button type="submit">Arrancar</button>
-                </form>
-                <form action="{{ url_for('stop_site', site_id=s.site_id) }}" method="post" class="inline-delete">
-                  <button type="submit">Detener</button>
-                </form>
-                <form action="{{ url_for('delete_site', site_id=s.site_id) }}" method="post" class="inline-delete"
-                      onsubmit="return confirm('¿Seguro que quieres eliminar el sitio {{ s.slug }}? Esta acción borrará namespace y DNS.');">
-                  <button type="submit">Eliminar</button>
-                </form>
+                <div class="actions">
+                  <form action="{{ url_for('start_site', site_id=s.site_id) }}" method="post">
+                    <button type="submit" class="button button-secondary">Arrancar</button>
+                  </form>
+                  <form action="{{ url_for('stop_site', site_id=s.site_id) }}" method="post">
+                    <button type="submit" class="button button-secondary">Detener</button>
+                  </form>
+                  <form action="{{ url_for('cache_rebuild_site', site_id=s.site_id) }}" method="post">
+                    <button type="submit" class="button button-primary">Cache rebuild</button>
+                  </form>
+                  <form action="{{ url_for('delete_site', site_id=s.site_id) }}" method="post"
+                        onsubmit="return confirm('¿Seguro que quieres eliminar el sitio {{ s.slug }}? Esta acción borrará namespace y DNS.');">
+                    <button type="submit" class="button button-danger">Eliminar</button>
+                  </form>
+                </div>
                 {% else %}
                 <span>Eliminado</span>
                 {% endif %}

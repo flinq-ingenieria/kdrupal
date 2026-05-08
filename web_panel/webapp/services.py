@@ -315,6 +315,39 @@ class K8sService:
         state = "arrancado" if running else "detenido"
         log(f"Escala aplicada: drupalcms={replicas}, mariadb={replicas} ({state})")
 
+    def run_drupal_command(self, namespace: str, command: str, log: LogFn) -> None:
+        pods = self.core.list_namespaced_pod(namespace=namespace, label_selector="app=drupalcms").items
+        pod = next((item for item in pods if item.status.phase == "Running"), None)
+        if not pod:
+            raise ServiceError(f"No hay pod drupalcms en ejecución en {namespace}")
+
+        pod_name = pod.metadata.name
+        log(f"Ejecutando en {namespace}/{pod_name}: {command}")
+        output = self._stream.stream(
+            self.core.connect_get_namespaced_pod_exec,
+            pod_name,
+            namespace,
+            container="app",
+            command=[
+                "/bin/sh",
+                "-lc",
+                f"cd /var/www/html/app && {command}; rc=$?; echo __KDRUPAL_EXIT_CODE:$rc; exit $rc",
+            ],
+            stderr=True,
+            stdin=False,
+            stdout=True,
+            tty=False,
+        )
+        exit_code = 0
+        if output:
+            for line in output.splitlines():
+                if line.startswith("__KDRUPAL_EXIT_CODE:"):
+                    exit_code = int(line.split(":", 1)[1])
+                    continue
+                log(line)
+        if exit_code != 0:
+            raise ServiceError(f"Comando Drupal falló con exit code {exit_code}")
+
 
 class DrupalProvisioner:
     def __init__(
@@ -446,3 +479,8 @@ class DrupalProvisioner:
         if not namespace.startswith(self.namespace_prefix):
             raise ServiceError(f"Namespace fuera de prefijo gestionado: {namespace}")
         self.k8s.scale_site(namespace, running, log)
+
+    def rebuild_cache(self, namespace: str, log: LogFn) -> None:
+        if not namespace.startswith(self.namespace_prefix):
+            raise ServiceError(f"Namespace fuera de prefijo gestionado: {namespace}")
+        self.k8s.run_drupal_command(namespace, "./vendor/bin/drush cr", log)

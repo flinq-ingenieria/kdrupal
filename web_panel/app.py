@@ -140,6 +140,21 @@ def create_app() -> Flask:
             db.update_site_status(site_id, "scale_failed")
             db.update_job(job_id, "failed", 1)
 
+    def run_cache_rebuild_job(job_id: str, site_id: str) -> None:
+        site = db.get_site(site_id)
+        if not site:
+            db.append_job_log(job_id, "ERROR: site no encontrado")
+            db.update_job(job_id, "failed", 1)
+            return
+        try:
+            append_log(job_id, f"[CACHE_REBUILD] Reconstruyendo cache Drupal en {site['namespace']}")
+            provisioner.rebuild_cache(site["namespace"], lambda msg: append_log(job_id, msg))
+            append_log(job_id, "[CACHE_REBUILD] Cache rebuild completado")
+            db.update_job(job_id, "success", 0)
+        except Exception as exc:
+            append_log(job_id, f"ERROR: {exc}")
+            db.update_job(job_id, "failed", 1)
+
     @app.get("/")
     def index() -> str:
         sites = db.list_sites()
@@ -258,6 +273,30 @@ def create_app() -> Flask:
             }
         )
         thread = threading.Thread(target=run_scale_job, args=(job_id, site_id, True), daemon=True)
+        thread.start()
+        return redirect(url_for("job_detail", job_id=job_id))
+
+    @app.post("/sites/<site_id>/cache-rebuild")
+    def cache_rebuild_site(site_id: str) -> Any:
+        site = db.get_site(site_id)
+        if not site:
+            abort(404)
+        if not site["namespace"].startswith(namespace_prefix):
+            abort(400, "El sitio no pertenece al prefijo gestionado")
+
+        job_id = str(uuid.uuid4())
+        db.insert_job(
+            {
+                "job_id": job_id,
+                "site_id": site_id,
+                "type": "cache-rebuild",
+                "status": "running",
+                "return_code": None,
+                "created_at": Database.utcnow(),
+                "finished_at": None,
+            }
+        )
+        thread = threading.Thread(target=run_cache_rebuild_job, args=(job_id, site_id), daemon=True)
         thread.start()
         return redirect(url_for("job_detail", job_id=job_id))
 

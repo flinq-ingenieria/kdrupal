@@ -42,6 +42,7 @@ Abrir:
 - `POST /sites` crear sitio
 - `POST /sites/<site_id>/start` arrancar sitio (scale replicas 1)
 - `POST /sites/<site_id>/stop` detener sitio (scale replicas 0)
+- `POST /sites/<site_id>/cache-rebuild` ejecutar `drush cr`
 - `POST /sites/<site_id>/delete` eliminar sitio completo (confirmación por diálogo)
 - `GET /jobs/<job_id>` estado y logs
 

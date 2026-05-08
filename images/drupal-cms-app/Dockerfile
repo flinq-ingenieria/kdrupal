@@ -16,7 +16,7 @@ RUN set -eux; \
     if [ ! -f ${APP_DIR}/composer.json ]; then \
       composer create-project "drupal/cms:^2" ${APP_DIR} --no-interaction; \
       cd ${APP_DIR}; \
-      composer require drupal/redirect --no-interaction; \
+      composer require drupal/redirect drupal/klaro --no-interaction; \
       composer install --no-interaction; \
       composer drupal:recipe-unpack --no-interaction || true; \
     fi

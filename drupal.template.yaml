@@ -137,7 +137,7 @@ spec:
       containers:
         - name: mariadb
           image: mariadb:10.11
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           ports:
             - name: mysql
               containerPort: 3306
@@ -190,7 +190,7 @@ spec:
               cpu: "100m"
               memory: "256Mi"
             limits:
-              cpu: "2"
+              cpu: "4"
               memory: "2Gi"
       volumes:
         - name: mariadb-data
@@ -234,7 +234,7 @@ spec:
       initContainers:
         - name: init-drupal-cms
           image: ${DRUPAL_APP_IMAGE}
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           env:
             - name: DB_NAME
               valueFrom:
@@ -287,7 +287,7 @@ spec:
               \$settings['reverse_proxy_addresses'] = [\$_SERVER['REMOTE_ADDR']];
               \$settings['file_public_path'] = 'sites/default/files';
               \$settings['testing_package_manager'] = TRUE;
-              \$config['system.site']['page']['front'] = '/user';
+              \$config['system.site']['page']['front'] = '/home';
               PHP
 
               chown -R www-data:www-data /mnt/sites-default
@@ -301,13 +301,13 @@ spec:
               cpu: "150m"
               memory: "384Mi"
             limits:
-              cpu: "3"
+              cpu: "4"
               memory: "2Gi"
 
       containers:
         - name: app
           image: ${DRUPAL_APP_IMAGE}
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           command:
             - /bin/sh
             - -ec
@@ -350,7 +350,7 @@ spec:
               cpu: "150m"
               memory: "256Mi"
             limits:
-              cpu: "2"
+              cpu: "4"
               memory: "2Gi"
 
       volumes:

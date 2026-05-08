@@ -232,9 +232,11 @@ spec:
       labels:
         app: drupalcms
     spec:
+      imagePullSecrets:
+        - name: ${IMAGE_PULL_SECRET_NAME}
       initContainers:
         - name: init-drupal-cms
-          image: drupal:11.3.8-php8.4-fpm-bookworm
+          image: ${DRUPAL_APP_IMAGE}
           imagePullPolicy: IfNotPresent
           env:
             - name: DB_NAME
@@ -257,22 +259,8 @@ spec:
             - -ec
             - |
               echo "memory_limit=1024M" > /usr/local/etc/php/conf.d/zz-memory-limit.ini
-              apt-get update
-              apt-get install -y --no-install-recommends git unzip curl ca-certificates
-              rm -rf /var/lib/apt/lists/*
-
-              curl -sS https://getcomposer.org/installer -o /tmp/composer-setup.php
-              php /tmp/composer-setup.php --install-dir=/usr/local/bin --filename=composer
-              rm -f /tmp/composer-setup.php
 
               mkdir -p /var/www/html/app
-
-              if [ ! -f /var/www/html/app/composer.json ]; then
-                composer create-project "drupal/cms:^2" /var/www/html/app --no-interaction
-                cd /var/www/html/app
-                composer install --no-interaction
-                composer drupal:recipe-unpack --no-interaction || true
-              fi
 
               mkdir -p /var/www/html/app/web/sites/default/files
               mkdir -p /var/www/html/app/config/sync
@@ -358,7 +346,7 @@ spec:
               memory: "256Mi"
 
         - name: php
-          image: drupal:11.3.8-php8.4-fpm-bookworm
+          image: ${DRUPAL_APP_IMAGE}
           imagePullPolicy: IfNotPresent
           workingDir: /var/www/html/app
           command:
@@ -378,7 +366,7 @@ spec:
               memory: "768Mi"
 
         - name: tools
-          image: drupal:11.3.8-php8.4-fpm-bookworm
+          image: ${DRUPAL_APP_IMAGE}
           imagePullPolicy: IfNotPresent
           workingDir: /var/www/html/app
           command:
@@ -386,12 +374,6 @@ spec:
             - -ec
             - |
               echo "memory_limit=1024M" > /usr/local/etc/php/conf.d/zz-memory-limit.ini
-              apt-get update
-              apt-get install -y --no-install-recommends git unzip curl mariadb-client ca-certificates
-              rm -rf /var/lib/apt/lists/*
-              curl -sS https://getcomposer.org/installer -o /tmp/composer-setup.php
-              php /tmp/composer-setup.php --install-dir=/usr/local/bin --filename=composer
-              rm -f /tmp/composer-setup.php
               sleep infinity
           volumeMounts:
             - name: drupalcms-code

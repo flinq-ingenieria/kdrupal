@@ -26,6 +26,12 @@ def create_app() -> Flask:
     default_base_domain = os.getenv("DEFAULT_BASE_DOMAIN", "").strip()
     default_admin_pass = os.getenv("DEFAULT_ADMIN_PASS", "").strip()
     namespace_prefix = os.getenv("NAMESPACE_PREFIX", "drupal-").strip()
+    drupal_app_image = os.getenv("DRUPAL_APP_IMAGE", "").strip()
+    image_pull_secret_name = os.getenv("IMAGE_PULL_SECRET_NAME", "ghcr-pull-secret").strip()
+    ghcr_registry = os.getenv("GHCR_REGISTRY", "ghcr.io").strip()
+    ghcr_username = os.getenv("GHCR_USERNAME", "").strip()
+    ghcr_token = os.getenv("GHCR_TOKEN", "").strip()
+    ghcr_email = os.getenv("GHCR_EMAIL", "noreply@example.com").strip()
     sqlite_path = os.getenv("SQLITE_PATH", str(Path(__file__).resolve().parent / "data" / "panel.db"))
     dinahosting_api_url = os.getenv("DINAHOSTING_API_URL", "").strip()
     dinahosting_auth_user = os.getenv("DINAHOSTING_AUTH_USER", "").strip()
@@ -39,6 +45,10 @@ def create_app() -> Flask:
         raise RuntimeError("DEFAULT_BASE_DOMAIN es obligatorio")
     if not default_admin_pass:
         raise RuntimeError("DEFAULT_ADMIN_PASS es obligatorio")
+    if not drupal_app_image:
+        raise RuntimeError("DRUPAL_APP_IMAGE es obligatorio")
+    if not ghcr_username or not ghcr_token:
+        raise RuntimeError("GHCR_USERNAME y GHCR_TOKEN son obligatorios")
     if not dinahosting_api_url or not dinahosting_auth_user or not dinahosting_auth_pwd or not dinahosting_dns_target:
         raise RuntimeError("Faltan variables de Dinahosting obligatorias (URL, AUTH_USER, AUTH_PWD, DNS_TARGET)")
 
@@ -55,6 +65,12 @@ def create_app() -> Flask:
         namespace_prefix=namespace_prefix,
         default_base_domain=default_base_domain,
         default_admin_pass=default_admin_pass,
+        drupal_app_image=drupal_app_image,
+        image_pull_secret_name=image_pull_secret_name,
+        ghcr_registry=ghcr_registry,
+        ghcr_username=ghcr_username,
+        ghcr_token=ghcr_token,
+        ghcr_email=ghcr_email,
         dns_target=dinahosting_dns_target,
         dns_ttl=dinahosting_dns_ttl,
     )

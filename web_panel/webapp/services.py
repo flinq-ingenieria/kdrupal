@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 import secrets
 import time
+import json
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
@@ -63,6 +64,8 @@ class SiteSpec:
     admin_email: str
     admin_password: str
     modules: list[str]
+    drupal_app_image: str
+    image_pull_secret_name: str
 
 
 class DnsService:
@@ -164,6 +167,45 @@ class K8sService:
                 return False
             raise
 
+    def ensure_namespace(self, namespace: str) -> None:
+        if self.namespace_exists(namespace):
+            return
+        body = self._client.V1Namespace(metadata=self._client.V1ObjectMeta(name=namespace))
+        self.core.create_namespace(body)
+
+    def ensure_image_pull_secret(
+        self,
+        namespace: str,
+        secret_name: str,
+        registry: str,
+        username: str,
+        password: str,
+        email: str,
+        log: LogFn,
+    ) -> None:
+        auth = {
+            "auths": {
+                registry: {
+                    "username": username,
+                    "password": password,
+                    "email": email,
+                }
+            }
+        }
+        body = self._client.V1Secret(
+            metadata=self._client.V1ObjectMeta(name=secret_name, namespace=namespace),
+            type="kubernetes.io/dockerconfigjson",
+            string_data={".dockerconfigjson": json.dumps(auth)},
+        )
+        try:
+            self.core.create_namespaced_secret(namespace=namespace, body=body)
+            log(f"Image pull secret creado: {secret_name}")
+        except self._api_exception as exc:
+            if exc.status != 409:
+                raise
+            self.core.replace_namespaced_secret(name=secret_name, namespace=namespace, body=body)
+            log(f"Image pull secret actualizado: {secret_name}")
+
     def read_existing_credentials(self, namespace: str) -> dict[str, str]:
         secret = self.core.read_namespaced_secret("drupalcms-secrets", namespace)
         data = secret.data or {}
@@ -196,6 +238,8 @@ class K8sService:
             "DRUPAL_ADMIN_USER": spec.admin_user,
             "DRUPAL_ADMIN_PASS": spec.admin_password,
             "DRUPAL_ADMIN_EMAIL": spec.admin_email,
+            "DRUPAL_APP_IMAGE": spec.drupal_app_image,
+            "IMAGE_PULL_SECRET_NAME": spec.image_pull_secret_name,
         }
 
         raw = self.manifest_template_path.read_text()
@@ -370,6 +414,12 @@ class DrupalProvisioner:
         namespace_prefix: str,
         default_base_domain: str,
         default_admin_pass: str,
+        drupal_app_image: str,
+        image_pull_secret_name: str,
+        ghcr_registry: str,
+        ghcr_username: str,
+        ghcr_token: str,
+        ghcr_email: str,
         dns_target: str,
         dns_ttl: int,
     ) -> None:
@@ -378,6 +428,12 @@ class DrupalProvisioner:
         self.namespace_prefix = namespace_prefix
         self.default_base_domain = default_base_domain
         self.default_admin_pass = default_admin_pass
+        self.drupal_app_image = drupal_app_image
+        self.image_pull_secret_name = image_pull_secret_name
+        self.ghcr_registry = ghcr_registry
+        self.ghcr_username = ghcr_username
+        self.ghcr_token = ghcr_token
+        self.ghcr_email = ghcr_email
         self.dns_target = dns_target
         self.dns_ttl = dns_ttl
 
@@ -412,6 +468,8 @@ class DrupalProvisioner:
             admin_email=admin_email,
             admin_password=admin_password,
             modules=modules,
+            drupal_app_image=self.drupal_app_image,
+            image_pull_secret_name=self.image_pull_secret_name,
         )
 
     def provision(self, spec: SiteSpec, log: LogFn) -> None:
@@ -438,6 +496,16 @@ class DrupalProvisioner:
         if not namespace_exists:
             self.dns.create_record(spec.domain, self.dns_target, self.dns_ttl, log)
 
+        self.k8s.ensure_namespace(spec.namespace)
+        self.k8s.ensure_image_pull_secret(
+            namespace=spec.namespace,
+            secret_name=spec.image_pull_secret_name,
+            registry=self.ghcr_registry,
+            username=self.ghcr_username,
+            password=self.ghcr_token,
+            email=self.ghcr_email,
+            log=log,
+        )
         self.k8s.apply_resources(spec, creds, log)
         self.k8s.wait_ready(spec.namespace, log)
         self.k8s.bootstrap_drupal(spec, log)

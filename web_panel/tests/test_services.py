@@ -43,6 +43,12 @@ class FakeK8s:
     def namespace_exists(self, namespace: str) -> bool:
         return self.namespace_exists_value
 
+    def ensure_namespace(self, namespace: str) -> None:
+        return None
+
+    def ensure_image_pull_secret(self, namespace: str, secret_name: str, registry: str, username: str, password: str, email: str, log) -> None:
+        log("pull secret ok")
+
     def secret_exists(self, namespace: str, name: str) -> bool:
         return False
 
@@ -81,6 +87,12 @@ def build_provisioner():
         namespace_prefix="drupal-",
         default_base_domain="example.com",
         default_admin_pass="FixedPass123!",
+        drupal_app_image="ghcr.io/test/drupal-cms-app:test",
+        image_pull_secret_name="ghcr-pull-secret",
+        ghcr_registry="ghcr.io",
+        ghcr_username="u",
+        ghcr_token="t",
+        ghcr_email="e@example.com",
         dns_target="203.0.113.10",
         dns_ttl=300,
     ), dns
@@ -105,6 +117,8 @@ def test_build_spec_generates_domain_if_missing():
     assert spec.domain.endswith(".example.com")
     assert spec.modules == ["redirect", "path"]
     assert spec.admin_password == "FixedPass123!"
+    assert spec.drupal_app_image == "ghcr.io/test/drupal-cms-app:test"
+    assert spec.image_pull_secret_name == "ghcr-pull-secret"
 
 
 def test_provision_calls_dns_for_new_namespace():

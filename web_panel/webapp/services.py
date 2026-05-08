@@ -171,7 +171,12 @@ class K8sService:
         if self.namespace_exists(namespace):
             return
         body = self._client.V1Namespace(metadata=self._client.V1ObjectMeta(name=namespace))
-        self.core.create_namespace(body)
+        try:
+            self.core.create_namespace(body)
+        except self._api_exception as exc:
+            if exc.status == 409:
+                return
+            raise
 
     def ensure_image_pull_secret(
         self,

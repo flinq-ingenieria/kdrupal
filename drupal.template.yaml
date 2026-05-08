@@ -305,6 +305,7 @@ spec:
               \$settings['reverse_proxy'] = TRUE;
               \$settings['reverse_proxy_addresses'] = [\$_SERVER['REMOTE_ADDR']];
               \$settings['file_public_path'] = 'sites/default/files';
+              \$settings['testing_package_manager'] = TRUE;
               PHP
 
               chown -R www-data:www-data /var/www/html/app

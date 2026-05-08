@@ -310,6 +310,8 @@ class K8sService:
                 log(f"Módulo {module}: habilitando")
                 run_www(f"cd /var/www/html/app && ./vendor/bin/drush en -y '{module}'")
 
+        # Garantiza estado consistente tras site-install y cambios de módulos.
+        run_www("cd /var/www/html/app && ./vendor/bin/drush cr")
         run_www("cd /var/www/html/app && ./vendor/bin/drush status")
         log("Bootstrap Drupal completado")
 

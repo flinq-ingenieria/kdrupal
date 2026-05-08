@@ -387,6 +387,10 @@ class DrupalProvisioner:
                 "drupal_hash_salt": random_hex(64),
             }
             stage("VALIDATION", "Namespace nuevo o sin secret: generando credenciales DB/hash_salt")
+        stage(
+            "DB_INFO",
+            f"host=mariadb database=drupalcms user=drupal password={creds['mariadb_password']}",
+        )
 
         if not namespace_exists:
             stage("DNS", f"Creando registro DNS para {spec.domain} -> {self.dns_target} (ttl={self.dns_ttl})")

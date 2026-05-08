@@ -296,8 +296,7 @@ spec:
 
               chown -R www-data:www-data /mnt/drupalcms-app/web/sites/default
               chmod -R ug+rwX /mnt/drupalcms-app/web/sites/default/files
-              chown root:root /mnt/drupalcms-app/web/sites/default/settings.php
-              chmod 0444 /mnt/drupalcms-app/web/sites/default/settings.php
+              chmod 0664 /mnt/drupalcms-app/web/sites/default/settings.php
           volumeMounts:
             - name: drupalcms-code
               mountPath: /mnt/drupalcms-app

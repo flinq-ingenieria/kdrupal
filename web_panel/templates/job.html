@@ -24,6 +24,13 @@ namespace={{ site.namespace }}
 domain={{ site.domain }}
 status={{ site.status }}</pre>
       {% endif %}
+      {% if db_info %}
+      <h2>Base de datos</h2>
+      <pre>host={{ db_info.host }}
+database={{ db_info.database }}
+user={{ db_info.user }}
+password={{ db_info.password }}</pre>
+      {% endif %}
       <h2>Logs</h2>
       <pre class="logs">{% for item in job.logs %}[{{ item.created_at }}] {{ item.line }}
 {% endfor %}</pre>

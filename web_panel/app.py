@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 import threading
 import uuid
 from pathlib import Path
@@ -223,7 +224,28 @@ def create_app() -> Flask:
             abort(404)
 
         site = db.get_site(job["site_id"]) if job.get("site_id") else None
-        return render_template("job.html", job=job, site=site, auth_token=extract_request_token())
+        db_info = None
+        for item in reversed(job.get("logs", [])):
+            line = item.get("line", "")
+            m = re.search(
+                r"\[DB_INFO\]\s+host=(\S+)\s+database=(\S+)\s+user=(\S+)\s+password=(\S+)",
+                line,
+            )
+            if m:
+                db_info = {
+                    "host": m.group(1),
+                    "database": m.group(2),
+                    "user": m.group(3),
+                    "password": m.group(4),
+                }
+                break
+        return render_template(
+            "job.html",
+            job=job,
+            site=site,
+            db_info=db_info,
+            auth_token=extract_request_token(),
+        )
 
     @app.errorhandler(ServiceError)
     def handle_service_error(err: ServiceError):

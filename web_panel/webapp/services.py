@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 import secrets
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
@@ -250,9 +251,20 @@ class K8sService:
 
     def find_tools_pod(self, namespace: str) -> str:
         pods = self.core.list_namespaced_pod(namespace, label_selector="app=drupalcms")
-        if not pods.items:
-            raise ServiceError("No se encontró pod de drupalcms")
-        return pods.items[0].metadata.name
+        candidates: list[str] = []
+        for pod in pods.items:
+            if pod.metadata.deletion_timestamp is not None:
+                continue
+            if (pod.status.phase or "") != "Running":
+                continue
+            container_names = {c.name for c in (pod.spec.containers or [])}
+            if "tools" not in container_names:
+                continue
+            candidates.append(pod.metadata.name)
+        if not candidates:
+            raise ServiceError("No se encontró pod Running con contenedor 'tools'")
+        # El más reciente suele ser el correcto tras un rollout.
+        return sorted(candidates)[-1]
 
     def exec_tools(self, namespace: str, pod: str, cmd: str) -> str:
         command = ["/bin/sh", "-lc", cmd]
@@ -269,16 +281,28 @@ class K8sService:
         )
         return output
 
-    def bootstrap_drupal(self, spec: SiteSpec, log: LogFn) -> None:
-        pod = self.find_tools_pod(spec.namespace)
+    def exec_tools_with_retry(self, namespace: str, cmd: str, retries: int = 6, delay: float = 3.0) -> str:
+        last_error: Exception | None = None
+        for _ in range(retries):
+            pod = self.find_tools_pod(namespace)
+            try:
+                return self.exec_tools(namespace, pod, cmd)
+            except Exception as exc:
+                last_error = exc
+                text = str(exc)
+                if "container not found (\"tools\")" in text or "NotFound" in text:
+                    time.sleep(delay)
+                    continue
+                raise
+        raise ServiceError(f"No se pudo ejecutar comando en contenedor tools tras reintentos: {last_error}")
 
+    def bootstrap_drupal(self, spec: SiteSpec, log: LogFn) -> None:
         def run_www(inner: str) -> str:
             wrapped = f"su -s /bin/sh www-data -c \"{inner}\""
-            return self.exec_tools(spec.namespace, pod, wrapped)
+            return self.exec_tools_with_retry(spec.namespace, wrapped)
 
-        self.exec_tools(
+        self.exec_tools_with_retry(
             spec.namespace,
-            pod,
             """set -e
             mkdir -p /var/www/html/app/web/sites/default/files
             chown -R www-data:www-data /var/www/html/app/web/sites/default/files

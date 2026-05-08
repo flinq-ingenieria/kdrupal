@@ -118,7 +118,7 @@ class Database:
     def list_sites(self) -> list[dict[str, Any]]:
         with self.connect() as conn:
             rows = conn.execute(
-                "SELECT * FROM sites ORDER BY created_at DESC"
+                "SELECT * FROM sites WHERE deleted_at IS NULL ORDER BY created_at DESC"
             ).fetchall()
         return [dict(r) for r in rows]
 

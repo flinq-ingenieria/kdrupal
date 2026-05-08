@@ -313,6 +313,8 @@ spec:
             - -ec
             - |
               echo "memory_limit=1024M" > /usr/local/etc/php/conf.d/zz-memory-limit.ini
+              echo "max_execution_time=300" > /usr/local/etc/php/conf.d/zz-max-execution-time.ini
+              echo "max_input_time=300" > /usr/local/etc/php/conf.d/zz-max-input-time.ini
               php-fpm -D
               exec nginx -g 'daemon off;'
           ports:

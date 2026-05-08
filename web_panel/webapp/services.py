@@ -260,6 +260,8 @@ class K8sService:
         for doc in docs:
             if not doc:
                 continue
+            if doc.get("kind") == "Namespace":
+                continue
             self._utils.create_from_dict(self._client.ApiClient(), data=doc, verbose=False)
 
         log("Recursos Kubernetes aplicados")

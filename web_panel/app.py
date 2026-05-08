@@ -147,9 +147,9 @@ def create_app() -> Flask:
             db.update_job(job_id, "failed", 1)
             return
         try:
-            append_log(job_id, f"[CACHE_REBUILD] Reconstruyendo cache Drupal en {site['namespace']}")
+            append_log(job_id, f"[CACHE_REBUILD] Iniciando cache rebuild en {site['namespace']}")
             provisioner.rebuild_cache(site["namespace"], lambda msg: append_log(job_id, msg))
-            append_log(job_id, "[CACHE_REBUILD] Cache rebuild completado")
+            append_log(job_id, "[CACHE_REBUILD] Cache rebuild completado correctamente")
             db.update_job(job_id, "success", 0)
         except Exception as exc:
             append_log(job_id, f"ERROR: {exc}")

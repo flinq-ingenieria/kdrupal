@@ -359,14 +359,14 @@ class K8sService:
         state = "arrancado" if running else "detenido"
         log(f"Escala aplicada: drupalcms={replicas}, mariadb={replicas} ({state})")
 
-    def run_drupal_command(self, namespace: str, command: str, log: LogFn) -> None:
+    def run_drupal_command(self, namespace: str, command: str, log: LogFn, display_command: str | None = None) -> None:
         pods = self.core.list_namespaced_pod(namespace=namespace, label_selector="app=drupalcms").items
         pod = next((item for item in pods if item.status.phase == "Running"), None)
         if not pod:
             raise ServiceError(f"No hay pod drupalcms en ejecución en {namespace}")
 
         pod_name = pod.metadata.name
-        log(f"Ejecutando en {namespace}/{pod_name}: {command}")
+        log(f"Ejecutando en {namespace}/{pod_name}: {display_command or command}")
         output = self._stream.stream(
             self.core.connect_get_namespaced_pod_exec,
             pod_name,
@@ -529,6 +529,7 @@ class DrupalProvisioner:
             raise ServiceError(f"Namespace fuera de prefijo gestionado: {namespace}")
         self.k8s.run_drupal_command(
             namespace,
-            "./vendor/bin/drush cr || { echo 'Primer cache rebuild falló; reintentando...'; ./vendor/bin/drush cr; }",
+            "./vendor/bin/drush cr >/tmp/kdrupal-cr-1.log 2>&1 || { echo 'Primer intento incompleto; reintentando cache rebuild...'; ./vendor/bin/drush cr; }",
             log,
+            display_command="./vendor/bin/drush cr",
         )

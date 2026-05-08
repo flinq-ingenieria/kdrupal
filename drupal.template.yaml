@@ -137,7 +137,7 @@ spec:
       containers:
         - name: mariadb
           image: mariadb:10.11
-          imagePullPolicy: Always
+          imagePullPolicy: IfNotPresent
           ports:
             - name: mysql
               containerPort: 3306
@@ -234,7 +234,7 @@ spec:
       initContainers:
         - name: init-drupal-cms
           image: ${DRUPAL_APP_IMAGE}
-          imagePullPolicy: Always
+          imagePullPolicy: IfNotPresent
           env:
             - name: DB_NAME
               valueFrom:
@@ -306,7 +306,7 @@ spec:
       containers:
         - name: app
           image: ${DRUPAL_APP_IMAGE}
-          imagePullPolicy: Always
+          imagePullPolicy: IfNotPresent
           command:
             - /bin/sh
             - -ec

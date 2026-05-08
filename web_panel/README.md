@@ -82,3 +82,6 @@ Luego crea un sitio desde la UI y valida que en Kubernetes los contenedores `ini
 
 
 La app crea/actualiza automáticamente un `imagePullSecret` por namespace usando `GHCR_*` e `IMAGE_PULL_SECRET_NAME`.
+
+
+El flujo de creación deja Drupal limpio y listo para **instalación web manual** (wizard en `/`).

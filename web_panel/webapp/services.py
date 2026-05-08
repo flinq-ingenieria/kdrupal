@@ -58,12 +58,9 @@ class SiteSpec:
     base_domain: str
     www_mode: str
     include_www: bool
-    site_name: str
-    locale: str
     admin_user: str
     admin_email: str
     admin_password: str
-    modules: list[str]
     drupal_app_image: str
     image_pull_secret_name: str
 
@@ -226,9 +223,6 @@ class K8sService:
             "mariadb_root_password": b64("mariadb-root-password"),
             "mariadb_password": b64("mariadb-password"),
             "drupal_hash_salt": b64("drupal-hash-salt"),
-            "drupal_admin_user": b64("drupal-admin-user"),
-            "drupal_admin_email": b64("drupal-admin-email"),
-            "drupal_admin_pass": b64("drupal-admin-pass"),
         }
 
     def apply_resources(self, spec: SiteSpec, creds: dict[str, str], log: LogFn) -> None:
@@ -240,9 +234,6 @@ class K8sService:
             "DRUPAL_HASH_SALT": creds["drupal_hash_salt"],
             "TLS_SECRET_NAME": spec.domain.replace(".", "-") + "-tls",
             "DOMAIN_REGEX": spec.domain.replace(".", "\\\\."),
-            "DRUPAL_ADMIN_USER": spec.admin_user,
-            "DRUPAL_ADMIN_PASS": spec.admin_password,
-            "DRUPAL_ADMIN_EMAIL": spec.admin_email,
             "DRUPAL_APP_IMAGE": spec.drupal_app_image,
             "IMAGE_PULL_SECRET_NAME": spec.image_pull_secret_name,
         }
@@ -347,61 +338,6 @@ class K8sService:
                 raise
         raise ServiceError(f"No se pudo ejecutar comando en contenedor tools tras reintentos: {last_error}")
 
-    def bootstrap_drupal(self, spec: SiteSpec, log: LogFn) -> None:
-        def run_www(inner: str) -> str:
-            wrapped = f"su -s /bin/sh www-data -c \"{inner}\""
-            return self.exec_tools_with_retry(spec.namespace, wrapped)
-
-        self.exec_tools_with_retry(
-            spec.namespace,
-            """set -e
-            mkdir -p /var/www/html/app/web/sites/default/files
-            chown -R www-data:www-data /var/www/html/app/web/sites/default/files
-            find /var/www/html/app/web/sites/default/files -type d -exec chmod 2775 {} \\;
-            find /var/www/html/app/web/sites/default/files -type f -exec chmod 0664 {} \\;
-            """,
-        )
-
-        status = run_www("cd /var/www/html/app && ./vendor/bin/drush status --fields=bootstrap --format=list 2>/dev/null || true")
-        if "Successful" in status:
-            log("Drupal ya instalado: ejecutando updb + cr")
-            run_www("cd /var/www/html/app && ./vendor/bin/drush updb -y")
-            run_www("cd /var/www/html/app && ./vendor/bin/drush cr")
-        else:
-            log("Drupal no instalado: ejecutando site-install")
-            run_www(
-                "cd /var/www/html/app && ./vendor/bin/drush site:install -y "
-                f"--locale='{spec.locale}' --site-name='{spec.site_name}' "
-                f"--account-name='{spec.admin_user}' --account-mail='{spec.admin_email}' "
-                f"--account-pass='{spec.admin_password}'"
-            )
-
-        # Normaliza UI admin: navigation como módulo, claro/gin como temas.
-        run_www("cd /var/www/html/app && ./vendor/bin/drush en -y navigation || true")
-        run_www("cd /var/www/html/app && ./vendor/bin/drush theme:enable claro gin || true")
-        run_www("cd /var/www/html/app && ./vendor/bin/drush cset -y system.theme admin claro || true")
-        run_www("cd /var/www/html/app && ./vendor/bin/drush updb -y || true")
-
-        if spec.modules:
-            enabled = run_www("cd /var/www/html/app && ./vendor/bin/drush pml --status=enabled --type=module --format=list")
-            for module in spec.modules:
-                if module in enabled.splitlines():
-                    log(f"Módulo {module}: ya habilitado")
-                    continue
-                log(f"Módulo {module}: habilitando")
-                run_www(f"cd /var/www/html/app && ./vendor/bin/drush en -y '{module}'")
-
-        # Algunos perfiles/recetas dejan page.front en /app sin ruta válida.
-        page_front = run_www("cd /var/www/html/app && ./vendor/bin/drush cget system.site page.front --format=list || true")
-        if "/app" in page_front:
-            run_www("cd /var/www/html/app && ./vendor/bin/drush cset -y system.site page.front / || true")
-            log("Front page corregida de /app a /")
-
-        # Garantiza estado consistente tras site-install y cambios de módulos.
-        run_www("cd /var/www/html/app && ./vendor/bin/drush cr")
-        run_www("cd /var/www/html/app && ./vendor/bin/drush status")
-        log("Bootstrap Drupal completado")
-
     def delete_namespace(self, namespace: str, log: LogFn) -> None:
         try:
             self.core.delete_namespace(namespace)
@@ -445,6 +381,8 @@ class DrupalProvisioner:
         self.dns_ttl = dns_ttl
 
     def build_spec(self, payload: dict[str, str], site_id: str) -> SiteSpec:
+        if not payload.get("site_slug", "").strip():
+            raise ServiceError("site_slug es obligatorio")
         slug = normalize_slug(payload.get("site_slug", ""))
         namespace = f"{self.namespace_prefix}{slug}"
         domain = (payload.get("domain") or "").strip()
@@ -456,10 +394,9 @@ class DrupalProvisioner:
         www_mode = payload.get("www_mode", "auto").strip()
         include = include_www(domain, www_mode)
 
-        admin_user = payload.get("admin_user", "admin").strip() or "admin"
-        admin_email = payload.get("admin_email", "").strip() or f"admin@{domain}"
+        admin_user = "pending-wizard"
+        admin_email = f"pending@{domain}"
         admin_password = self.default_admin_pass
-        modules = [m for m in payload.get("modules", "redirect").split() if m]
 
         return SiteSpec(
             site_id=site_id,
@@ -469,41 +406,47 @@ class DrupalProvisioner:
             base_domain=self.default_base_domain,
             www_mode=www_mode,
             include_www=include,
-            site_name=payload.get("site_name", "Mi Drupal").strip() or "Mi Drupal",
-            locale=payload.get("locale", "es").strip() or "es",
             admin_user=admin_user,
             admin_email=admin_email,
             admin_password=admin_password,
-            modules=modules,
             drupal_app_image=self.drupal_app_image,
             image_pull_secret_name=self.image_pull_secret_name,
         )
 
     def provision(self, spec: SiteSpec, log: LogFn) -> None:
+        def stage(name: str, message: str) -> None:
+            log(f"[{name}] {message}")
+
+        stage("VALIDATION", f"Inicio provisioning slug={spec.slug} namespace={spec.namespace} domain={spec.domain}")
         namespace_exists = self.k8s.namespace_exists(spec.namespace)
         creds: dict[str, str]
         if namespace_exists and self.k8s.secret_exists(spec.namespace, "drupalcms-secrets"):
-            log("Namespace existente: reutilizando credenciales del secret")
+            stage("VALIDATION", "Namespace existente: reutilizando credenciales de drupalcms-secrets")
             old = self.k8s.read_existing_credentials(spec.namespace)
             creds = {
                 "mariadb_root_password": old["mariadb_root_password"],
                 "mariadb_password": old["mariadb_password"],
                 "drupal_hash_salt": old["drupal_hash_salt"],
             }
-            spec.admin_user = old.get("drupal_admin_user") or spec.admin_user
-            spec.admin_email = old.get("drupal_admin_email") or spec.admin_email
-            spec.admin_password = old.get("drupal_admin_pass") or spec.admin_password
         else:
             creds = {
                 "mariadb_root_password": random_hex(32),
                 "mariadb_password": random_hex(32),
                 "drupal_hash_salt": random_hex(64),
             }
+            stage("VALIDATION", "Namespace nuevo o sin secret: generando credenciales DB/hash_salt")
 
         if not namespace_exists:
+            stage("DNS", f"Creando registro DNS para {spec.domain} -> {self.dns_target} (ttl={self.dns_ttl})")
             self.dns.create_record(spec.domain, self.dns_target, self.dns_ttl, log)
+            stage("DNS", "Registro DNS creado")
+        else:
+            stage("DNS", "Namespace existente: se omite creación DNS")
 
+        stage("NAMESPACE", "Asegurando namespace")
         self.k8s.ensure_namespace(spec.namespace)
+        stage("NAMESPACE", "Namespace OK")
+        stage("PULL_SECRET", f"Asegurando imagePullSecret '{spec.image_pull_secret_name}' en {spec.namespace}")
         self.k8s.ensure_image_pull_secret(
             namespace=spec.namespace,
             secret_name=spec.image_pull_secret_name,
@@ -513,9 +456,14 @@ class DrupalProvisioner:
             email=self.ghcr_email,
             log=log,
         )
+        stage("PULL_SECRET", "imagePullSecret OK")
+        stage("APPLY", "Aplicando manifiestos Kubernetes")
         self.k8s.apply_resources(spec, creds, log)
+        stage("APPLY", "Manifiestos aplicados")
+        stage("WAIT_DB", "Esperando mariadb listo")
         self.k8s.wait_ready(spec.namespace, log)
-        self.k8s.bootstrap_drupal(spec, log)
+        stage("WAIT_APP", "Pod de aplicación listo")
+        stage("READY_FOR_WIZARD", f"Drupal listo para instalación web manual: https://{spec.domain}/")
 
     def delete_site(self, namespace: str, domain: str, log: LogFn) -> None:
         if not namespace.startswith(self.namespace_prefix):

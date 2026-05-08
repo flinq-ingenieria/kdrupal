@@ -105,18 +105,14 @@ def test_build_spec_generates_domain_if_missing():
             "site_slug": "acme",
             "domain": "",
             "www_mode": "auto",
-            "site_name": "Acme",
-            "locale": "es",
-            "admin_user": "admin",
-            "admin_email": "",
-            "modules": "redirect path",
+            "site_slug": "acme",
         },
         site_id="1",
     )
     assert spec.namespace == "drupal-acme"
     assert spec.domain.endswith(".example.com")
-    assert spec.modules == ["redirect", "path"]
     assert spec.admin_password == "FixedPass123!"
+    assert spec.admin_user == "pending-wizard"
     assert spec.drupal_app_image == "ghcr.io/test/drupal-cms-app:test"
     assert spec.image_pull_secret_name == "ghcr-pull-secret"
 

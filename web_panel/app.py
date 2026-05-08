@@ -24,7 +24,7 @@ def create_app() -> Flask:
 
     panel_auth_token = os.getenv("PANEL_AUTH_TOKEN", "").strip()
     default_base_domain = os.getenv("DEFAULT_BASE_DOMAIN", "").strip()
-    default_admin_pass = os.getenv("DEFAULT_ADMIN_PASS", "").strip()
+    default_admin_pass = os.getenv("DEFAULT_ADMIN_PASS", "pending-wizard").strip() or "pending-wizard"
     namespace_prefix = os.getenv("NAMESPACE_PREFIX", "drupal-").strip()
     drupal_app_image = os.getenv("DRUPAL_APP_IMAGE", "").strip()
     image_pull_secret_name = os.getenv("IMAGE_PULL_SECRET_NAME", "ghcr-pull-secret").strip()
@@ -43,8 +43,6 @@ def create_app() -> Flask:
 
     if not default_base_domain:
         raise RuntimeError("DEFAULT_BASE_DOMAIN es obligatorio")
-    if not default_admin_pass:
-        raise RuntimeError("DEFAULT_ADMIN_PASS es obligatorio")
     if not drupal_app_image:
         raise RuntimeError("DRUPAL_APP_IMAGE es obligatorio")
     if not ghcr_username or not ghcr_token:
@@ -114,9 +112,10 @@ def create_app() -> Flask:
                 }
             )
 
-            append_log(job_id, f"Site: {spec.slug} namespace={spec.namespace} domain={spec.domain}")
+            append_log(job_id, f"[VALIDATION] Site spec generado slug={spec.slug} namespace={spec.namespace} domain={spec.domain}")
             provisioner.provision(spec, lambda msg: append_log(job_id, msg))
             db.update_site_status(site_id, "active")
+            append_log(job_id, f"[READY_FOR_WIZARD] Accede a https://{spec.domain}/ y completa la instalación Drupal.")
             db.update_job(job_id, "success", 0)
         except Exception as exc:
             db.update_site_status(site_id, "failed")
@@ -165,11 +164,6 @@ def create_app() -> Flask:
             "site_slug": site_slug,
             "domain": request.form.get("domain", "").strip(),
             "www_mode": request.form.get("www_mode", "auto").strip(),
-            "site_name": request.form.get("site_name", "Mi Drupal").strip(),
-            "locale": request.form.get("locale", "es").strip(),
-            "admin_user": request.form.get("admin_user", "admin").strip(),
-            "admin_email": request.form.get("admin_email", "").strip(),
-            "modules": request.form.get("modules", "redirect").strip(),
         }
 
         site_id = str(uuid.uuid4())

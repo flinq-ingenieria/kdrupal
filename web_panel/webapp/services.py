@@ -483,4 +483,8 @@ class DrupalProvisioner:
     def rebuild_cache(self, namespace: str, log: LogFn) -> None:
         if not namespace.startswith(self.namespace_prefix):
             raise ServiceError(f"Namespace fuera de prefijo gestionado: {namespace}")
-        self.k8s.run_drupal_command(namespace, "./vendor/bin/drush cr", log)
+        self.k8s.run_drupal_command(
+            namespace,
+            "./vendor/bin/drush cr || { echo 'Primer cache rebuild falló; reintentando...'; ./vendor/bin/drush cr; }",
+            log,
+        )

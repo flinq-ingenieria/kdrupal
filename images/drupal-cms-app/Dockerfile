@@ -21,19 +21,6 @@ RUN set -eux; \
       composer drupal:recipe-unpack --no-interaction || true; \
     fi
 
-COPY kdrupal_installer_fix ${APP_DIR}/web/modules/custom/kdrupal_installer_fix
-
-RUN set -eux; \
-    PROFILE_INFO="$(find ${APP_DIR}/web -path '*/drupal_cms_installer.info.yml' -print -quit)"; \
-    test -n "$PROFILE_INFO"; \
-    if ! grep -q 'kdrupal_installer_fix' "$PROFILE_INFO"; then \
-      if grep -q '^dependencies:' "$PROFILE_INFO"; then \
-        sed -i '/^dependencies:/a\  - kdrupal_installer_fix:kdrupal_installer_fix' "$PROFILE_INFO"; \
-      else \
-        printf '\ndependencies:\n  - kdrupal_installer_fix:kdrupal_installer_fix\n' >> "$PROFILE_INFO"; \
-      fi; \
-    fi
-
 RUN set -eux; \
     mkdir -p ${APP_DIR}/web/sites/default/files ${APP_DIR}/config/sync; \
     chown -R www-data:www-data ${APP_DIR}; \

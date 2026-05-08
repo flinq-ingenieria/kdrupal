@@ -93,7 +93,7 @@ spec:
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: drupalcms-code
+  name: drupalcms-sites-default
   namespace: ${NAMESPACE}
 spec:
   accessModes:
@@ -257,14 +257,9 @@ spec:
             - |
               echo "memory_limit=1024M" > /usr/local/etc/php/conf.d/zz-memory-limit.ini
 
-              mkdir -p /mnt/drupalcms-app
-              if [ ! -f /mnt/drupalcms-app/composer.json ]; then
-                cp -a /var/www/html/app/. /mnt/drupalcms-app/
-              fi
+              mkdir -p /mnt/sites-default/files
 
-              mkdir -p /mnt/drupalcms-app/web/sites/default/files
-
-              cat > /mnt/drupalcms-app/web/sites/default/settings.php <<PHP
+              cat > /mnt/sites-default/settings.php <<PHP
               <?php
               \$databases['default']['default'] = [
                 'database' => '${DB_NAME}',
@@ -294,12 +289,12 @@ spec:
               \$settings['testing_package_manager'] = TRUE;
               PHP
 
-              chown -R www-data:www-data /mnt/drupalcms-app/web/sites/default
-              chmod -R ug+rwX /mnt/drupalcms-app/web/sites/default/files
-              chmod 0664 /mnt/drupalcms-app/web/sites/default/settings.php
+              chown -R www-data:www-data /mnt/sites-default
+              chmod -R ug+rwX /mnt/sites-default/files
+              chmod 0664 /mnt/sites-default/settings.php
           volumeMounts:
-            - name: drupalcms-code
-              mountPath: /mnt/drupalcms-app
+            - name: drupalcms-sites-default
+              mountPath: /mnt/sites-default
           resources:
             requests:
               cpu: "150m"
@@ -317,8 +312,12 @@ spec:
               containerPort: 80
           workingDir: /var/www/html/app
           volumeMounts:
-            - name: drupalcms-code
-              mountPath: /var/www/html/app
+            - name: drupalcms-sites-default
+              mountPath: /var/www/html/app/web/sites/default/files
+              subPath: files
+            - name: drupalcms-sites-default
+              mountPath: /var/www/html/app/web/sites/default/settings.php
+              subPath: settings.php
             - name: nginx-config
               mountPath: /etc/nginx/conf.d/default.conf
               subPath: default.conf
@@ -345,9 +344,9 @@ spec:
               memory: "768Mi"
 
       volumes:
-        - name: drupalcms-code
+        - name: drupalcms-sites-default
           persistentVolumeClaim:
-            claimName: drupalcms-code
+            claimName: drupalcms-sites-default
         - name: nginx-config
           configMap:
             name: drupalcms-nginx

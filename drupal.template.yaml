@@ -190,8 +190,8 @@ spec:
               cpu: "100m"
               memory: "256Mi"
             limits:
-              cpu: "1"
-              memory: "768Mi"
+              cpu: "2"
+              memory: "2Gi"
       volumes:
         - name: mariadb-data
           persistentVolumeClaim:
@@ -300,13 +300,20 @@ spec:
               cpu: "150m"
               memory: "384Mi"
             limits:
-              cpu: "2"
-              memory: "1Gi"
+              cpu: "3"
+              memory: "2Gi"
 
       containers:
         - name: app
           image: ${DRUPAL_APP_IMAGE}
           imagePullPolicy: IfNotPresent
+          command:
+            - /bin/sh
+            - -ec
+            - |
+              echo "memory_limit=1024M" > /usr/local/etc/php/conf.d/zz-memory-limit.ini
+              php-fpm -D
+              exec nginx -g 'daemon off;'
           ports:
             - name: http
               containerPort: 80
@@ -340,8 +347,8 @@ spec:
               cpu: "150m"
               memory: "256Mi"
             limits:
-              cpu: "1"
-              memory: "768Mi"
+              cpu: "2"
+              memory: "2Gi"
 
       volumes:
         - name: drupalcms-sites-default

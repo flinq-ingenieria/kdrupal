@@ -282,8 +282,8 @@ class K8sService:
             """set -e
             mkdir -p /var/www/html/app/web/sites/default/files
             chown -R www-data:www-data /var/www/html/app/web/sites/default/files
-            find /var/www/html/app/web/sites/default/files -type d -exec chmod 2775 {} \;
-            find /var/www/html/app/web/sites/default/files -type f -exec chmod 0664 {} \;
+            find /var/www/html/app/web/sites/default/files -type d -exec chmod 2775 {} \\;
+            find /var/www/html/app/web/sites/default/files -type f -exec chmod 0664 {} \\;
             """,
         )
 
@@ -300,6 +300,11 @@ class K8sService:
                 f"--account-name='{spec.admin_user}' --account-mail='{spec.admin_email}' "
                 f"--account-pass='{spec.admin_password}'"
             )
+
+        # Normaliza UI admin: navigation como módulo, claro/gin como temas.
+        run_www("cd /var/www/html/app && ./vendor/bin/drush en -y navigation || true")
+        run_www("cd /var/www/html/app && ./vendor/bin/drush theme:enable claro gin || true")
+        run_www("cd /var/www/html/app && ./vendor/bin/drush cset -y system.theme admin claro || true")
 
         if spec.modules:
             enabled = run_www("cd /var/www/html/app && ./vendor/bin/drush pml --status=enabled --type=module --format=list")

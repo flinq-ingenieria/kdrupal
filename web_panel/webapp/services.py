@@ -252,9 +252,53 @@ class K8sService:
                 continue
             if doc.get("kind") == "Namespace":
                 continue
-            self._utils.create_from_dict(self._client.ApiClient(), data=doc, verbose=False)
+            self._apply_resource(doc)
 
         log("Recursos Kubernetes aplicados")
+
+    def _apply_resource(self, doc: dict) -> None:
+        kind = doc.get("kind")
+        metadata = doc.get("metadata") or {}
+        name = metadata.get("name")
+        namespace = metadata.get("namespace")
+        if not kind or not name:
+            raise ServiceError(f"Manifiesto inválido sin kind/name: {doc}")
+
+        try:
+            self._utils.create_from_dict(self._client.ApiClient(), data=doc, verbose=False)
+            return
+        except self._api_exception as exc:
+            if exc.status != 409:
+                raise
+
+        if kind == "Secret":
+            # drupalcms-secrets contiene credenciales existentes; no las regeneramos en reapply.
+            return
+        if kind == "PersistentVolumeClaim":
+            return
+        if kind == "ConfigMap":
+            self.core.replace_namespaced_config_map(name, namespace, doc)
+            return
+        if kind == "Service":
+            current = self.core.read_namespaced_service(name, namespace)
+            doc["spec"]["clusterIP"] = current.spec.cluster_ip
+            doc["spec"].pop("clusterIPs", None)
+            doc["spec"].pop("ipFamilies", None)
+            doc["spec"].pop("ipFamilyPolicy", None)
+            self.core.replace_namespaced_service(name, namespace, doc)
+            return
+        if kind == "Deployment":
+            self.apps.patch_namespaced_deployment(name, namespace, doc)
+            return
+        if kind == "StatefulSet":
+            self.apps.patch_namespaced_stateful_set(name, namespace, doc)
+            return
+        if kind == "Ingress":
+            networking = self._client.NetworkingV1Api()
+            networking.patch_namespaced_ingress(name, namespace, doc)
+            return
+
+        raise ServiceError(f"Recurso existente no soportado para apply idempotente: {kind}/{name}")
 
     def wait_ready(self, namespace: str, log: LogFn) -> None:
         try:

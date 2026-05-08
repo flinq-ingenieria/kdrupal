@@ -287,7 +287,6 @@ spec:
               \$settings['reverse_proxy_addresses'] = [\$_SERVER['REMOTE_ADDR']];
               \$settings['file_public_path'] = 'sites/default/files';
               \$settings['testing_package_manager'] = TRUE;
-              \$config['system.site']['page']['front'] = '/user';
               PHP
 
               chown -R www-data:www-data /mnt/sites-default

@@ -329,6 +329,7 @@ class K8sService:
         run_www("cd /var/www/html/app && ./vendor/bin/drush en -y navigation || true")
         run_www("cd /var/www/html/app && ./vendor/bin/drush theme:enable claro gin || true")
         run_www("cd /var/www/html/app && ./vendor/bin/drush cset -y system.theme admin claro || true")
+        run_www("cd /var/www/html/app && ./vendor/bin/drush updb -y || true")
 
         if spec.modules:
             enabled = run_www("cd /var/www/html/app && ./vendor/bin/drush pml --status=enabled --type=module --format=list")
@@ -338,6 +339,12 @@ class K8sService:
                     continue
                 log(f"Módulo {module}: habilitando")
                 run_www(f"cd /var/www/html/app && ./vendor/bin/drush en -y '{module}'")
+
+        # Algunos perfiles/recetas dejan page.front en /app sin ruta válida.
+        page_front = run_www("cd /var/www/html/app && ./vendor/bin/drush cget system.site page.front --format=list || true")
+        if "/app" in page_front:
+            run_www("cd /var/www/html/app && ./vendor/bin/drush cset -y system.site page.front / || true")
+            log("Front page corregida de /app a /")
 
         # Garantiza estado consistente tras site-install y cambios de módulos.
         run_www("cd /var/www/html/app && ./vendor/bin/drush cr")

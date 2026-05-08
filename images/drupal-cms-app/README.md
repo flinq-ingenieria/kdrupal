@@ -51,12 +51,12 @@ docker pull "$IMAGE:$TAG"
 
 Para usar esta imagen y acelerar arranque:
 
-- Sustituir `image: drupal:11.3.8-php8.4-fpm-bookworm` por `image: ghcr.io/<org>/drupal-cms-app:<tag>` en `init-drupal-cms`, `php` y `tools`.
+- Sustituir por `image: ghcr.io/<org>/drupal-cms-app:<tag>` en `init-drupal-cms` y en el contenedor único `app` (nginx+php-fpm).
 - Eliminar `apt-get`, `composer installer`, `composer create-project` en runtime (ya vienen en la imagen).
 - Mantener en runtime solo:
   - creación de `settings.php`
-  - bootstrap `drush`
   - permisos de `sites/default/files`
+  - arranque de `php-fpm` + `nginx` en el mismo contenedor
 
 ## 7) ¿Hay que cambiar profundamente el programa?
 

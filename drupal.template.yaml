@@ -257,9 +257,14 @@ spec:
             - |
               echo "memory_limit=1024M" > /usr/local/etc/php/conf.d/zz-memory-limit.ini
 
-              mkdir -p /var/www/html/app/web/sites/default/files
+              mkdir -p /mnt/drupalcms-app
+              if [ ! -f /mnt/drupalcms-app/composer.json ]; then
+                cp -a /var/www/html/app/. /mnt/drupalcms-app/
+              fi
 
-              cat > /var/www/html/app/web/sites/default/settings.php <<PHP
+              mkdir -p /mnt/drupalcms-app/web/sites/default/files
+
+              cat > /mnt/drupalcms-app/web/sites/default/settings.php <<PHP
               <?php
               \$databases['default']['default'] = [
                 'database' => '${DB_NAME}',
@@ -289,12 +294,12 @@ spec:
               \$settings['testing_package_manager'] = TRUE;
               PHP
 
-              chown -R www-data:www-data /var/www/html/app/web/sites/default
-              chmod -R ug+rwX /var/www/html/app/web/sites/default/files
-              chmod 644 /var/www/html/app/web/sites/default/settings.php
+              chown -R www-data:www-data /mnt/drupalcms-app/web/sites/default
+              chmod -R ug+rwX /mnt/drupalcms-app/web/sites/default/files
+              chmod 644 /mnt/drupalcms-app/web/sites/default/settings.php
           volumeMounts:
             - name: drupalcms-code
-              mountPath: /var/www/html/app/web/sites/default
+              mountPath: /mnt/drupalcms-app
           resources:
             requests:
               cpu: "150m"
@@ -304,15 +309,16 @@ spec:
               memory: "1Gi"
 
       containers:
-        - name: nginx
-          image: nginx:1.27
+        - name: app
+          image: ${DRUPAL_APP_IMAGE}
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
               containerPort: 80
+          workingDir: /var/www/html/app
           volumeMounts:
             - name: drupalcms-code
-              mountPath: /var/www/html/app/web/sites/default
+              mountPath: /var/www/html/app
             - name: nginx-config
               mountPath: /etc/nginx/conf.d/default.conf
               subPath: default.conf
@@ -332,52 +338,11 @@ spec:
             failureThreshold: 6
           resources:
             requests:
-              cpu: "100m"
-              memory: "128Mi"
-            limits:
-              cpu: "500m"
+              cpu: "150m"
               memory: "256Mi"
-
-        - name: php
-          image: ${DRUPAL_APP_IMAGE}
-          imagePullPolicy: IfNotPresent
-          workingDir: /var/www/html/app
-          command:
-            - /bin/sh
-            - -ec
-            - |
-              exec php-fpm
-          volumeMounts:
-            - name: drupalcms-code
-              mountPath: /var/www/html/app/web/sites/default
-          resources:
-            requests:
-              cpu: "100m"
-              memory: "256Mi"
-            limits:
-              cpu: "2"
-              memory: "768Mi"
-
-        - name: tools
-          image: ${DRUPAL_APP_IMAGE}
-          imagePullPolicy: IfNotPresent
-          workingDir: /var/www/html/app
-          command:
-            - /bin/sh
-            - -ec
-            - |
-              echo "memory_limit=1024M" > /usr/local/etc/php/conf.d/zz-memory-limit.ini
-              sleep infinity
-          volumeMounts:
-            - name: drupalcms-code
-              mountPath: /var/www/html/app/web/sites/default
-          resources:
-            requests:
-              cpu: "25m"
-              memory: "128Mi"
             limits:
               cpu: "1"
-              memory: "512Mi"
+              memory: "768Mi"
 
       volumes:
         - name: drupalcms-code

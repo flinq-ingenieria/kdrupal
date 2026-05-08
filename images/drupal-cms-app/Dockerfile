@@ -5,7 +5,7 @@ ENV APP_DIR=/var/www/html/app
 
 RUN set -eux; \
     apt-get update; \
-    apt-get install -y --no-install-recommends git unzip curl mariadb-client ca-certificates; \
+    apt-get install -y --no-install-recommends git unzip curl mariadb-client ca-certificates nginx; \
     rm -rf /var/lib/apt/lists/*; \
     curl -sS https://getcomposer.org/installer -o /tmp/composer-setup.php; \
     php /tmp/composer-setup.php --install-dir=/usr/local/bin --filename=composer; \
@@ -27,4 +27,4 @@ RUN set -eux; \
 
 WORKDIR /var/www/html/app
 
-CMD ["php-fpm"]
+CMD ["/bin/sh", "-lc", "php-fpm -D && exec nginx -g 'daemon off;'"]

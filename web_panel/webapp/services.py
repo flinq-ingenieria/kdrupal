@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import re
 import secrets
-import time
 import json
 from dataclasses import dataclass
 from pathlib import Path
@@ -290,53 +289,6 @@ class K8sService:
                 if ready >= 1:
                     w2.stop()
         log("Deployment drupalcms listo")
-
-    def find_tools_pod(self, namespace: str) -> str:
-        pods = self.core.list_namespaced_pod(namespace, label_selector="app=drupalcms")
-        candidates: list[str] = []
-        for pod in pods.items:
-            if pod.metadata.deletion_timestamp is not None:
-                continue
-            if (pod.status.phase or "") != "Running":
-                continue
-            container_names = {c.name for c in (pod.spec.containers or [])}
-            if "tools" not in container_names:
-                continue
-            candidates.append(pod.metadata.name)
-        if not candidates:
-            raise ServiceError("No se encontró pod Running con contenedor 'tools'")
-        # El más reciente suele ser el correcto tras un rollout.
-        return sorted(candidates)[-1]
-
-    def exec_tools(self, namespace: str, pod: str, cmd: str) -> str:
-        command = ["/bin/sh", "-lc", cmd]
-        output = self._stream.stream(
-            self.core.connect_get_namespaced_pod_exec,
-            pod,
-            namespace,
-            container="tools",
-            command=command,
-            stderr=True,
-            stdin=False,
-            stdout=True,
-            tty=False,
-        )
-        return output
-
-    def exec_tools_with_retry(self, namespace: str, cmd: str, retries: int = 6, delay: float = 3.0) -> str:
-        last_error: Exception | None = None
-        for _ in range(retries):
-            pod = self.find_tools_pod(namespace)
-            try:
-                return self.exec_tools(namespace, pod, cmd)
-            except Exception as exc:
-                last_error = exc
-                text = str(exc)
-                if "container not found (\"tools\")" in text or "NotFound" in text:
-                    time.sleep(delay)
-                    continue
-                raise
-        raise ServiceError(f"No se pudo ejecutar comando en contenedor tools tras reintentos: {last_error}")
 
     def delete_namespace(self, namespace: str, log: LogFn) -> None:
         try:
